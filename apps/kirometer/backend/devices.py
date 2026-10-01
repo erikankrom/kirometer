@@ -23,6 +23,9 @@ _link = {"connected": False, "port": None, "status": None, "message": "No device
 
 def validate_controls(payload):
     out={}
+    if 'screen_layout' in payload:
+        if payload['screen_layout'] not in ('ghost','usage'):raise ValueError('Choose Ghost companion or Usage dashboard.')
+        out['screen_layout']=payload['screen_layout']
     if 'brightness' in payload:
         n=payload['brightness']
         if not isinstance(n,int) or isinstance(n,bool) or not 5<=n<=255:raise ValueError('Brightness must be 5–255.')
