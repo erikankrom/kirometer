@@ -94,3 +94,52 @@ class ActivityBindingTests(unittest.TestCase):
             read.assert_called_with(state)
             collector.bind_activity_state(None)
             self.assertIs(collector._activity_state,state)
+
+class IndependentCadenceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_activity_wakes_delivery_without_another_usage_read(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as root:
+            ctx=types.SimpleNamespace(config={},data_dir=root)
+            sample={'available':True,'credits':[{'used':4,'limit':1000}],'age_seconds':10,'stale':False,'activity':'idle'}
+            with patch.object(collector,'collect',return_value=sample.copy()) as reads,patch.object(collector._activity_tracker,'read',return_value={'activity':'idle'}):
+                await collector.on_startup(ctx)
+                try:
+                    await asyncio.sleep(.01)
+                    self.assertEqual(reads.call_count,1)
+                    self.assertEqual(collector._settings['poll_seconds'],300)
+                    revision=collector._revision
+                    waiter=asyncio.create_task(collector.wait_for_update(revision,10))
+                    await asyncio.sleep(0)
+                    with patch.object(collector._activity_tracker,'read',return_value={'activity':'attention'}):
+                        collector.refresh_activity()
+                    await asyncio.wait_for(waiter,.1)
+                    self.assertEqual(collector.current_snapshot()['activity'],'attention')
+                    self.assertEqual(reads.call_count,1)
+                    # A transition during a transport write must not wait for keepalive.
+                    await asyncio.wait_for(collector.wait_for_update(revision,10),.1)
+                finally:await collector.on_shutdown(ctx)
+
+    def test_cached_age_advances_without_recollection(self):
+        from unittest.mock import patch
+        with patch.object(collector,'_snapshot',{'age_seconds':280,'stale':False}),patch.object(collector,'_usage_collected_mono',100),patch.object(collector,'_settings',{'poll_seconds':300,'stale_after':300}):
+            data=collector.current_snapshot(125)
+            self.assertEqual(data['age_seconds'],305)
+            self.assertTrue(data['stale'])
+            self.assertEqual(data['next_usage_poll_seconds'],275)
+            self.assertEqual(collector._snapshot['age_seconds'],280)
+
+    async def test_settings_persist_preserve_other_config_and_reschedule(self):
+        from unittest.mock import patch,AsyncMock
+        with tempfile.TemporaryDirectory() as root:
+            ctx=types.SimpleNamespace(config={'db_path':'example.db'},data_dir=root)
+            event=asyncio.Event()
+            with patch.object(collector,'_settings',{'poll_seconds':300,'stale_after':300}),patch.object(collector,'_usage_reschedule',event):
+                request=types.SimpleNamespace(method='POST',json=AsyncMock(return_value={'poll_seconds':600}))
+                response=await collector.settings(request,ctx)
+                self.assertEqual(response.status,200)
+                self.assertEqual(collector.read_settings(ctx),{'db_path':'example.db','poll_seconds':600})
+                self.assertTrue(event.is_set())
+                for invalid in (True,0,3601,1.5,'300',None):
+                    request.json=AsyncMock(return_value={'poll_seconds':invalid})
+                    self.assertEqual((await collector.settings(request,ctx)).status,400)
+                self.assertEqual(collector._settings['poll_seconds'],600)

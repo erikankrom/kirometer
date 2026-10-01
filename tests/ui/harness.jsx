@@ -54,13 +54,16 @@ const usage = {
     },
   ],
 };
+let pollingSeconds = 300;
 const api = {
   async get(path) {
     if (scenario === "error") throw Error("Offline");
+    if (path.endsWith("/settings")) return {poll_seconds:pollingSeconds,activity_poll_ms:250};
     return structuredClone(path.endsWith("snapshot") ? usage : info);
   },
   async post(path, body) {
     const op = path.split("/").pop();
+    if(op === "settings") {pollingSeconds=body.poll_seconds; return {poll_seconds:pollingSeconds};}
     if (op === "controls") {
       const seq = ++sequence;
       setTimeout(() => {

@@ -141,9 +141,37 @@ function UsageSummary({ data, error }) {
     ),
   );
 }
+function AppSettings({api}) {
+  const [saved, setSaved] = useState(null), [interval, setIntervalValue] = useState(300),
+    [busy, setBusy] = useState(false), [message, setMessage] = useState("");
+  useEffect(()=>{
+    let active=true;
+    api.get("/api/apps/kirometer/settings").then(data=>{
+      if(active){setSaved(data.poll_seconds);setIntervalValue(data.poll_seconds);}
+    }).catch(()=>{if(active)setMessage("Could not load app settings. Reopen this page to retry.");});
+    return ()=>{active=false;};
+  },[api]);
+  const saveSettings=async()=>{
+    setBusy(true);setMessage("");
+    try {
+      const result=await api.post("/api/apps/kirometer/settings",{poll_seconds:interval});
+      if(result.error)throw Error(result.error);
+      setSaved(result.poll_seconds);setIntervalValue(result.poll_seconds);
+      setMessage("Saved. Usage refresh timing updated; activity stays fast.");
+    } catch(e){setMessage(e.message || "Settings could not be saved.");}
+    finally{setBusy(false);}
+  };
+  return h("details",{className:"panel gap"},
+    h("summary",null,"App settings"),
+    h("div",{className:"stack"},
+      field("Usage refresh interval (seconds)",h("input",{type:"number",min:5,max:3600,step:1,value:interval,disabled:saved===null || busy,onChange:e=>setIntervalValue(e.target.value===""?"":Number(e.target.value))}),"Default: 300 seconds (5 minutes). Applies to plan and overage credit reads. Range: 5–3,600 seconds."),
+      h("p",{className:"small muted"},"Activity checks every 250 ms and sends changes immediately. A 5-second keepalive maintains the device connection. Usage refresh timing does not slow activity or device controls."),
+      h("div",{className:"row"},button(busy?"Saving…":"Save app settings",saveSettings,busy || saved===null || saved===interval || !Number.isInteger(interval) || interval<5 || interval>3600,"primary")),
+      message && h("p",{className:"small muted",role:"status"},message)));
+}
 export default function Kirometer() {
   const api = sdk.useAppApi(),
-    usage = usePolling(api, "/api/apps/kirometer/snapshot", 5000);
+    usage = usePolling(api, "/api/apps/kirometer/snapshot", 1000);
   return h(
     "main",
     { className: "km" },
@@ -167,10 +195,11 @@ export default function Kirometer() {
       ),
     ),
     h(DeviceManager, { api, usage }),
+    h(AppSettings, { api }),
     h(
       "p",
       { className: "footer" },
-      "Usage comes from Crew’s billing cache, with the IDE cache as a fallback. Device sync continues while this page is closed.",
+      "Credits are cached separately from live activity. Usage comes from Crew’s billing cache, with the IDE cache as a fallback. Sync continues while this page is closed.",
     ),
   );
 }

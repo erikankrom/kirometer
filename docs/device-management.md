@@ -130,3 +130,31 @@ failure, and interruption states. The latest eight updates (24,000 characters ea
 are retained locally in `firmware-updates.json` under the app data directory. A
 restart during a running update marks it interrupted. Flash verification and
 confirmed firmware boot remain distinct statuses.
+
+## Independent usage and activity timing (app 0.10.0)
+
+The collector reads the local billing/IDE cache once at startup and then every
+300 seconds by default. App settings → Usage refresh interval overrides this
+from 5 to 3,600 seconds and reschedules the next read without reconnecting.
+The value is stored as `poll_seconds` in the app's `data/config.json`.
+Existing explicit values are preserved on upgrade.
+
+Crew's in-memory session state is classified every 250 ms, without a usage read
+or log scan. Activity changes and device controls notify the transport directly;
+no fixed three-second delay follows a send. Changes during an in-flight write
+are coalesced into the next delivery. An unchanged connection gets a five-second
+keepalive containing the cached usage. Bluetooth delivery time is additional to
+detection time; 250 ms is the sampling interval, not an end-to-end guarantee.
+The connection status includes `delivery_ms` for the latest write/ack cycle.
+
+The UI reads the in-memory snapshot every second. Cached data age keeps advancing
+and can become stale between billing reads. This setting does not force Kiro to
+fetch new billing data from its service or control Crew's own billing refresh.
+No firmware reflash is needed.
+
+The installed Crew build's billing cache uses `_USAGE_REFRESH_SECS = 600` in
+`dashboard/handlers/sessions.py`. The top-bar endpoint checks eligibility every
+approximately 30 seconds while polled; this is demand-triggered, not a guarantee
+that a cache refresh runs with no dashboard polling. Five-minute Kirometer reads
+can therefore show values roughly 10–15 minutes behind, plus source fetch time.
+Crew deliberately limits refreshes because its CLI fallback may consume credits.

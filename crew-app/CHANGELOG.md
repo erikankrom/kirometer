@@ -1,5 +1,12 @@
 # Release notes
 
+## 0.10.0
+
+- Cache credit usage for five minutes by default, adjustable in App settings (5–3,600 seconds).
+- Check Crew activity every 250 ms and wake Bluetooth/USB delivery immediately when activity or controls change.
+- Keep a five-second connection heartbeat independent of billing reads.
+- Advance cached-data age accurately between reads and keep app activity responsive.
+
 ## 0.9.1
 
 - Move default-face selection into the first Default screen tab.
