@@ -6,12 +6,29 @@ from pathlib import Path
 import tempfile
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 import test_crew_app
 
 devices = importlib.import_module('kirometer_test_backend.devices')
 
 class DeviceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_usb_inventory_filters_metadata_and_caches_without_opening_ports(self):
+        ctx = types.SimpleNamespace(data_dir='/tmp/inventory-test')
+        data = [{'device':'/dev/cu.usbmodem1','serial_number':'SERIAL-1','vid':123,'token':'private'},
+                {'device':'/dev/cu.other','serial_number':'OTHER'}]
+        with patch.object(devices, '_inventory_cache', None), patch.object(devices, 'tools_ready', return_value=True), patch.object(devices, 'command', new_callable=AsyncMock, return_value=json.dumps(data)) as command:
+            result = await devices.port_inventory(ctx, ['/dev/cu.usbmodem1'])
+            self.assertEqual(result, [{'device':'/dev/cu.usbmodem1','serial_number':'SERIAL-1','vid':123}])
+            self.assertEqual(await devices.port_inventory(ctx, ['/dev/cu.usbmodem1']), result)
+            command.assert_awaited_once()
+            await devices.port_inventory(ctx, ['/dev/cu.usbmodem2'])
+            self.assertEqual(command.await_count, 2)
+
+    async def test_usb_inventory_failure_does_not_break_device_status(self):
+        ctx = types.SimpleNamespace(data_dir='/tmp/inventory-test')
+        with patch.object(devices, '_inventory_cache', None), patch.object(devices, 'tools_ready', return_value=True), patch.object(devices, 'command', new_callable=AsyncMock, side_effect=TimeoutError):
+            self.assertEqual(await devices.port_inventory(ctx, ['/dev/cu.usbmodem1']), [])
+
     def bundle(self):
         temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
         root=Path(temp.name);raw=b'firmware fixture';(root/'firmware.bin').write_bytes(raw)

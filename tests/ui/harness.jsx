@@ -10,6 +10,7 @@ const connected = () => ({
   message: "Usage delivered",
   status: {
     device_id: "test-device",
+    touch_supported: true, touch_events: 12, swipe_events: 3, paired: true, uptime_seconds: 420, animation_interval_ms: 50,
     device_name: "Alex’s Kirometer",
     version: "0.6.0",
     controls_supported: true,
@@ -32,6 +33,7 @@ let info = {
   bluetooth_ready: true,
   default_name: "alex kirometer",
   ports: ["/dev/cu.test-device"],
+  port_details: [{device:"/dev/cu.test-device",serial_number:"SAMPLE-USB-SERIAL",description:"USB JTAG/serial debug unit",vid:12346,pid:4097}],
   bundled_firmware: "/test/firmware.json",
   link: connected(),
   job: { id: "old-flash", kind: "flash", state: "complete", version: "0.6.0" },

@@ -12,6 +12,7 @@ const styles = `
 .km .badge{font-size:12px;font-weight:650;border-radius:6px;background:var(--km-tint);padding:4px 9px}.km .status{font-size:13px;display:inline-flex;align-items:center;gap:7px}.km .dot{width:7px;height:7px;border-radius:50%;background:var(--muted,#686170)}.km .online .dot{background:var(--ok,#218445)}.km .notice{padding:12px 15px;background:var(--bg,#f5f3f8);border-left:3px solid var(--km-purple);border-radius:5px;font-size:14px;overflow-wrap:anywhere}.km .notice.error{border-color:var(--danger,#b4233c);color:var(--danger,#b4233c)}.km .notice.success{border-color:var(--ok,#218445)}
 .km .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border,#ddd8e2);margin:24px -24px 20px;padding:0 24px;overflow:auto}.km .tabs button{border:0;border-radius:0;background:transparent;white-space:nowrap;padding:12px 8px;border-bottom:3px solid transparent;min-height:48px}.km .tabs button[aria-selected=true]{border-bottom-color:var(--km-purple);font-weight:750}.km .fields{display:grid;grid-template-columns:1fr 1fr;gap:20px}.km label.field{display:grid;gap:7px;font-size:14px;font-weight:600}.km label.field .hint{font-size:12px;font-weight:400;color:var(--muted-strong,var(--muted,#686170))}.km input:not([type=checkbox]):not([type=radio]):not([type=range]),.km select{font:inherit;font-size:15px;background:var(--bg,#f5f3f8);color:var(--text,#211d26);border:1px solid var(--border-strong,var(--border,#d3cbdc));border-radius:8px;padding:10px 12px;min-height:44px;width:100%}.km input[type=range]{width:100%;accent-color:var(--km-purple);min-height:32px}.km input[type=checkbox],.km input[type=radio]{accent-color:var(--km-purple);width:17px;height:17px;flex-shrink:0}.km fieldset{border:0;margin:0;padding:0;min-width:0}.km .save{border-top:1px solid var(--border,#ddd8e2);padding-top:18px;margin-top:20px}.km .numbers{font-size:32px;letter-spacing:-1px;font-weight:650;line-height:1.25}.km .meter{height:8px;border-radius:8px;background:var(--border,#ddd8e2);overflow:hidden;display:flex}.km .meter .used{background:var(--km-purple)}.km .meter .over{background:var(--danger,#b4233c)}.km dl{margin:0;display:grid;gap:12px}.km dl>div{display:flex;justify-content:space-between;gap:18px;font-size:13px}.km dt{color:var(--muted-strong,var(--muted,#686170))}.km dd{margin:0;text-align:right;overflow-wrap:anywhere}.km .divider{height:1px;background:var(--border,#ddd8e2)}.km .empty{display:grid;justify-items:start;gap:15px}.km .options{display:grid;grid-template-columns:1fr 1fr;gap:14px}.km .choice{text-align:left!important;padding:20px!important;display:grid;gap:6px}.km .choice span{font-weight:400;font-size:13px;color:var(--muted-strong,var(--muted,#686170))}.km .steps{list-style:none;padding:0;margin:20px 0;display:flex;gap:12px;font-size:13px}.km .steps li{flex:1;padding-top:9px;border-top:3px solid var(--border,#ddd8e2);color:var(--muted-strong,var(--muted,#686170))}.km .steps li.current{border-color:var(--km-purple);color:var(--text,#211d26);font-weight:650}.km .device-list{display:grid;gap:8px;padding:0;list-style:none;margin:0}.km .device-list li label{display:flex;gap:12px;align-items:center;padding:14px;border:1px solid var(--border,#ddd8e2);border-radius:9px;cursor:pointer}.km .device-list small{display:block;color:var(--muted-strong,var(--muted,#686170))}.km details summary{font-size:13px;cursor:pointer;color:var(--muted-strong,var(--muted,#686170));padding:8px 0}.km details>div{margin-top:10px}.km .confirm{display:flex;gap:10px;align-items:flex-start;font-size:13px}.km .footer{font-size:12px;color:var(--muted-strong,var(--muted,#686170));margin-top:20px}.km .loading{min-height:170px;display:grid;place-content:center;color:var(--muted,#686170)}
 .km .layout-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-top:12px}.km .screen-card{border:2px solid var(--border,#ddd8e2);border-radius:14px;padding:12px;display:grid;align-content:start;gap:12px;cursor:pointer;transition:border-color .15s,background .15s}.km .screen-card.selected{border-color:var(--km-purple);background:var(--km-tint)}.km .screen-card:has(input:focus-visible){outline:3px solid var(--km-purple);outline-offset:3px}.km .screen-card img{width:100%;height:auto;aspect-ratio:1;display:block;border-radius:9px;background:#000}.km .screen-card .card-title{display:flex;align-items:center;gap:8px;font-size:14px}.km .screen-card .card-title input{margin:0}.km .screen-card p{font-size:12px;color:var(--muted-strong,var(--muted,#686170));line-height:1.5}.km .screen-card .choice-state{font-size:11px;font-weight:600;color:var(--km-purple)}.km fieldset:disabled .screen-card{cursor:default}.km .firmware-console{background:#08080b;color:#e6e1ef;padding:16px;border-radius:10px;max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,monospace}.km summary{cursor:pointer}.km .gallery-legend{font-size:14px;font-weight:650}.km .gallery-note{margin-top:12px;font-size:12px;color:var(--muted-strong,var(--muted,#686170))}
+.km .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:24px}.km .info-section{min-width:0;display:grid;align-content:start;gap:16px}.km .info-section dl>div{padding-bottom:10px;border-bottom:1px solid var(--border,#ddd8e2);align-items:baseline}.km .info-section dt{flex:0 0 42%}.km .info-section dd{min-width:0}.km .info-section code{font-size:12px;overflow-wrap:anywhere}.km .info-port{padding:16px;border:1px solid var(--border,#ddd8e2);border-radius:10px;display:grid;gap:12px}
 @media(max-width:950px){.km .layout{grid-template-columns:1fr}.km aside{order:2}.km aside .stack{gap:12px}}@media(max-width:600px){.km{padding:18px}.km .panel{padding:18px}.km .fields,.km .options{grid-template-columns:1fr}.km .tabs{margin-left:-18px;margin-right:-18px;padding:0 18px}.km h1{font-size:28px}.km .device-icon{width:48px;height:48px;flex-basis:48px}.km .steps{gap:8px;font-size:12px}}
 `;
 const uiIcon = name => h("span", {className:"km-icon", "aria-hidden":true, dangerouslySetInnerHTML:{__html:icons[name] || ""}});
@@ -208,7 +209,7 @@ function DeviceManager({ api, usage }) {
   const [info, setInfo] = useState(null),
     [view, setView] = useState("manage"),
     [browseGallery, setBrowseGallery] = useState(false),
-    [tab, setTab] = useState("screen"),
+    [tab, setTab] = useState("info"),
     [flow, setFlow] = useState(null),
     [step, setStep] = useState(1);
   const [port, setPort] = useState(""),
@@ -781,6 +782,64 @@ function DeviceManager({ api, usage }) {
       ),
       saveBar(),
     );
+  const deviceInfo = () => {
+    const capability = value => value === true ? "Supported" : value === false ? "Not supported" : "Not reported";
+    const faceName = id => screenLayouts.find(face => face.id === id)?.title || id || "Not reported";
+    const uptime = Number.isFinite(d?.uptime_seconds) ? `${Math.floor(d.uptime_seconds / 3600)}h ${Math.floor(d.uptime_seconds % 3600 / 60)}m ${Math.floor(d.uptime_seconds % 60)}s` : "Not reported";
+    const rows = values => h("dl", null, ...values.map(([name, value]) => h("div", {key:name}, h("dt", null, name), h("dd", null, value ?? "Not reported"))));
+    const section = (title, values) => h("section", {className:"info-section", "aria-label":title}, h("h3", null, title), rows(values));
+    const activeUSB = info?.link?.transport === "usb" ? info.link.port : null;
+    const usbDetails = info?.port_details || [];
+    return h("div", {className:"stack"},
+      h("div", null, h("h3", null, "About your Kirometer"), h("p", {className:"small muted"}, "Live device details and capabilities reported by the firmware. USB information comes from this computer.")),
+      h("div", {className:"info-grid"},
+        section("Device", [
+          ["Name", d?.device_name],
+          ["Device ID", d?.device_id ? h("code", null, d.device_id) : null],
+          ["Firmware", d?.version],
+          ["Display", 'Waveshare · 2.16″ AMOLED · 480 × 480'],
+          ["Uptime", uptime],
+        ]),
+        section("Connection & power", [
+          ["Connection", linked ? info.link.transport === "bluetooth" ? "Bluetooth LE" : "USB" : "Disconnected"],
+          ["USB port", activeUSB ? h("code", null, activeUSB) : "Not connected over USB"],
+          ["Bluetooth identifier", info?.link?.transport === "bluetooth" ? h("code", null, info.link.port) : "Not available on this connection"],
+          ["Bluetooth paired", d?.paired === true ? "Yes" : d?.paired === false ? "No" : "Not reported"],
+          ["Power source", d?.power_source === "usb" ? "USB" : d?.power_source === "battery" ? "Battery" : "Not reported"],
+          ["Battery", d?.battery_percent != null ? `${d.battery_percent}%${d.charging ? " · charging" : ""}` : "Not reported / no battery detected"],
+          ["Last delivery", info?.link?.last_ack_at ? new Date(info.link.last_ack_at * 1000).toLocaleTimeString() : "Not reported"],
+        ]),
+        section("Capabilities", [
+          ["Bluetooth", capability(d?.bluetooth_supported)],
+          ["Touch input", capability(d?.touch_supported)],
+          ["Device controls", capability(d?.controls_supported)],
+          ["Selectable faces", capability(d?.screen_layouts_supported)],
+          ["Available faces", d?.screen_layouts_supported ? screenLayouts.filter(face => (d.screen_layouts_version || 1) >= (face.capabilityVersion || 1)).length : "Not reported"],
+          ["Swipe navigation", Number.isFinite(d?.swipe_events) ? "Supported" : "Not reported"],
+        ]),
+        section("Display status", [
+          ["Current face", faceName(d?.screen_layout)],
+          ["Startup face", faceName(d?.default_screen_layout)],
+          ["Brightness", d?.brightness != null ? `${Math.round(d.brightness / 255 * 100)}%` : null],
+          ["Screensaver", typeof d?.sleeping === "boolean" ? d.sleeping ? "Active" : "Inactive" : null],
+          ["Animation interval", d?.animation_interval_ms != null ? `${d.animation_interval_ms} ms` : null],
+          ["Touch events", d?.touch_events],
+          ["Swipe events", d?.swipe_events],
+        ])),
+      h("div", {className:"divider"}),
+      h("section", {className:"stack", "aria-label":"USB ports on this computer"},
+        h("h3", null, "USB ports on this computer"),
+        h("p", {className:"small muted"}, "Detected ports may belong to other devices. A USB serial number is separate from the firmware Device ID and the macOS Bluetooth identifier."),
+        !(info?.ports?.length) ? h("p", {className:"small muted"}, "No USB serial ports detected. Bluetooth does not require a USB connection.") :
+        h("div", {className:"info-grid"}, ...info.ports.map(path => {
+          const portInfo = usbDetails.find(item => item.device === path);
+          return h("div", {key:path, className:"info-port"},
+            h("div", {className:"row"}, h("code", null, path), activeUSB === path && h("span", {className:"badge"}, "Active connection")),
+            rows([["USB serial number", portInfo?.serial_number || "Not reported"], ["Description", portInfo?.description || "Not reported"],
+              ["Vendor / product ID", Number.isInteger(portInfo?.vid) && Number.isInteger(portInfo?.pid) ? [portInfo.vid,portInfo.pid].map(n => n.toString(16).padStart(4,"0").toUpperCase()).join(" : ") : "Not reported"]]));
+        }))),
+      h("p", {className:"small muted"}, "Device status refreshes automatically. USB metadata is cached for up to 15 seconds; checking it does not reset the device."));
+  };
   const connection = () =>
     h(
       "div",
@@ -1179,7 +1238,7 @@ function DeviceManager({ api, usage }) {
                       role: "tablist",
                       "aria-label": "Device settings",
                     },
-                    ...["screen", "display", "connection", "firmware"].map((t) =>
+                    ...["info", "screen", "display", "connection", "firmware"].map((t) =>
                       h(
                         "button",
                         {
@@ -1188,7 +1247,7 @@ function DeviceManager({ api, usage }) {
                           role: "tab",
                           tabIndex: tab === t ? 0 : -1,
                           onKeyDown: (event) => {
-                            const tabs = ["screen", "display", "connection", "firmware"];
+                            const tabs = ["info", "screen", "display", "connection", "firmware"];
                             const delta =
                               event.key === "ArrowRight"
                                 ? 1
@@ -1222,7 +1281,9 @@ function DeviceManager({ api, usage }) {
                             setNotice("");
                           },
                         },
-                        t === "screen"
+                        t === "info"
+                          ? "Device info"
+                          : t === "screen"
                           ? "Default screen"
                           : t === "display"
                           ? "Customize"
@@ -1239,7 +1300,9 @@ function DeviceManager({ api, usage }) {
                       id: "km-panel-" + tab,
                       "aria-labelledby": "km-tab-" + tab,
                     },
-                    tab === "screen"
+                    tab === "info"
+                      ? deviceInfo()
+                      : tab === "screen"
                       ? defaultScreen()
                       : tab === "display"
                       ? display()

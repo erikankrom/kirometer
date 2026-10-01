@@ -23,6 +23,8 @@ _link_task = None
 _pending_controls = None
 _control_seq = secrets.randbits(31)
 _link = {"connected": False, "port": None, "status": None, "message": "No device linked"}
+_inventory_cache = None
+_inventory_lock = asyncio.Lock()
 
 
 def validate_controls(payload):
@@ -85,6 +87,30 @@ def check_port(port):
     if port not in ports():
         raise ValueError('Select a currently connected USB serial device.')
     return port
+
+
+async def port_inventory(ctx, current_ports):
+    """Cache host metadata; enumeration never opens a serial connection."""
+    global _inventory_cache
+    if not current_ports or not tools_ready(ctx):
+        return []
+    key = (str(ctx.data_dir), tuple(current_ports))
+    async with _inventory_lock:
+        if _inventory_cache and _inventory_cache[0] == key and time.monotonic() < _inventory_cache[1]:
+            return _inventory_cache[2]
+        try:
+            raw = json.loads(await command([python(ctx), Path(__file__).with_name('port_inventory.py')], timeout=5))
+            result = []
+            for item in raw:
+                if not isinstance(item, dict) or item.get('device') not in current_ports:
+                    continue
+                result.append({k: v for k, v in item.items()
+                               if k in ('device', 'description', 'serial_number', 'manufacturer', 'vid', 'pid')
+                               and (v is None or isinstance(v, (str, int))) and len(str(v)) <= 200})
+        except (ValueError, TypeError, OSError, TimeoutError):
+            result = []
+        _inventory_cache = (key, time.monotonic() + 15, result)
+        return result
 
 
 def validate_bundle(path):
@@ -274,7 +300,9 @@ async def route(request,ctx):
     try:
         if request.method == 'GET':
             load_history(ctx)
-            return web.json_response({'supported':sys.platform=='darwin','ports':ports(),'tools_ready':tools_ready(ctx),'bluetooth_ready':bluetooth_ready(ctx),'default_name':default_name(),'job':_job,'firmware_updates':_history,'link':_link,'bundled_firmware':str(Path(__file__).resolve().parents[1] / 'firmware/firmware.json')},headers={'Cache-Control':'no-store'})
+            current_ports = ports()
+            inventory = await port_inventory(ctx, current_ports)
+            return web.json_response({'supported':sys.platform=='darwin','ports':current_ports,'port_details':inventory,'tools_ready':tools_ready(ctx),'bluetooth_ready':bluetooth_ready(ctx),'default_name':default_name(),'job':_job,'firmware_updates':_history,'link':_link,'bundled_firmware':str(Path(__file__).resolve().parents[1] / 'firmware/firmware.json')},headers={'Cache-Control':'no-store'})
         payload = await request.json()
         if not isinstance(payload,dict):
             raise ValueError('Device request must be a JSON object.')

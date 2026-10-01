@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.3
+
+- Add Device info as the first tab, with device identity, firmware, connection, power, display status, and reported capabilities.
+- Show USB serial numbers and ports using read-only metadata enumeration.
+- Expand the Crew app to the full available window width.
+
 ## 0.11.2
 
 - Withdraw notification sounds and test-sound controls while hardware stability is investigated.

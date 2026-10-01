@@ -1,6 +1,6 @@
 {
   "name": "kirometer",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "displayName": "Kirometer",
   "description": "A little companion for your Kiro day. See credit usage and activity on your desk, connect over Bluetooth, and make your Kirometer feel like yours. Includes guided USB firmware setup and device controls for macOS.",
   "minKiroCrewVersion": "0.7.2",
