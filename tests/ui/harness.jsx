@@ -13,6 +13,7 @@ const connected = () => ({
     device_name: "Alex’s Kirometer",
     version: "0.6.0",
     controls_supported: true,
+    sounds_supported: true, audio_ready:true, sound_enabled:false, sound_preset:"chime",
     screen_layouts_supported: true, screen_layouts_version: 2,
     screen_layout: "ghost", default_screen_layout: "ghost",
     bluetooth_supported: true,

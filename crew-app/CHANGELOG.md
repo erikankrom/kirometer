@@ -1,5 +1,12 @@
 # Release notes
 
+## 0.11.0
+
+- Opt-in device notification sounds: Chime, Ding, Blip, Pop and Pulse from Kiro Crew.
+- Firmware 0.7.0 plays once when a Crew session begins waiting for a response. Approvals, completion, repeated syncs and reconnects stay silent.
+- Save sound enablement and selection on the device from Customize; laptop sound settings remain unchanged.
+- Audio runs on a separate task to keep touch, display animation and Bluetooth responsive.
+
 ## 0.10.0
 
 - Cache credit usage for five minutes by default, adjustable in App settings (5–3,600 seconds).
