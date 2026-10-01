@@ -1,0 +1,13 @@
+{
+  "name": "kirometer-ui-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild harness.jsx --bundle --format=esm --outfile=harness.bundle.mjs"
+  },
+  "devDependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "esbuild": "0.28.2"
+  }
+}

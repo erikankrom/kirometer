@@ -1,0 +1,71 @@
+name: Publish Crew app release
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+concurrency:
+  group: crew-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate release and runtime
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import json, os
+          version=json.load(open('crew-app/app.json'))['version']
+          assert os.environ['RELEASE_TAG']=='v'+version, 'Tag must match app.json version'
+          PY
+          python -m pip install aiohttp pyserial
+          python -m unittest test_bluetooth test_devices test_crew_app test_usb_protocol test_kirometer test_deployment test_package
+          node --check crew-app/ui/index.mjs
+          g++ -std=c++17 tests/render_timing_test.cpp -o /tmp/render-test
+          /tmp/render-test
+      - name: Build runtime package and registry
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: python scripts/package_crew_app.py --registry-dir .dist/crew --repo "https://github.com/$REPOSITORY"
+      - name: Publish package and release channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh release upload "$RELEASE_TAG" exports/kirometer-crew-app.zip --clobber
+          if git ls-remote --exit-code --heads origin crew-release > /dev/null; then
+            git fetch origin crew-release:refs/remotes/origin/crew-release
+            python - <<'PYCODE'
+          import json, subprocess
+          current=json.loads(subprocess.check_output(['git','show','refs/remotes/origin/crew-release:apps/kirometer/app.json']))['version']
+          proposed=json.load(open('crew-app/app.json'))['version']
+          def version(value): return tuple(map(int,value.split('.')))
+          assert version(proposed)>=version(current), 'Refusing to roll the stable release channel backward'
+          PYCODE
+          fi
+          git -C .dist/crew init
+          git -C .dist/crew config user.name 'github-actions[bot]'
+          git -C .dist/crew config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C .dist/crew add .
+          # Import objects locally; no token is written into the distribution tree.
+          git -C .dist/crew commit -m "Package $RELEASE_TAG"
+          git fetch .dist/crew HEAD
+          TREE=$(git rev-parse FETCH_HEAD^{tree})
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git show-ref --verify --quiet refs/remotes/origin/crew-release; then
+            COMMIT=$(git commit-tree "$TREE" -p refs/remotes/origin/crew-release -m "Release $RELEASE_TAG")
+          else
+            COMMIT=$(git commit-tree "$TREE" -m "Release $RELEASE_TAG")
+          fi
+          git push origin "$COMMIT:refs/heads/crew-release"
