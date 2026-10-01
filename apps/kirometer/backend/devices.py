@@ -289,6 +289,8 @@ async def route(request,ctx):
             if not (_link.get('status') or {}).get('controls_supported'):raise ValueError('Flash Kirometer 0.5.3 to enable device controls.')
             controls=validate_controls(payload)
             _control_seq+=1;controls['seq']=_control_seq;_pending_controls=controls
+            from .runtime import notify_update
+            notify_update()
             return web.json_response({'queued':True,'control_seq':_control_seq},status=202)
         if action == 'bluetooth_scan':
             if not bluetooth_ready(ctx):raise ValueError('Set up Bluetooth tools first.')
@@ -383,9 +385,10 @@ async def bridge_once(ctx,port,transport='usb'):
             proc.stdin.write((json.dumps({'address':port,'token':pairing(ctx)['token']})+'\n').encode());await proc.stdin.drain()
         seq=0;provisioned=False
         while True:
-            from .runtime import _snapshot
+            from . import runtime
+            revision=runtime._revision
             seq+=1
-            snapshot=_snapshot or {'available':False,'stale':True,'credits':[],'activity':'unknown'}
+            snapshot=runtime.current_snapshot()
             # Project only the usage contract; exclude cache paths and unrelated content.
             payload={k:snapshot.get(k) for k in ('available','stale','credits','activity','plan')}
             payload.update(type='kirometer.usage',protocol=1,seq=seq)
@@ -395,6 +398,7 @@ async def bridge_once(ctx,port,transport='usb'):
                 controls={**(controls or {}),'seq':(controls or {}).get('seq',_control_seq_local),'pairing_token':pairing(ctx)['token']}
                 if not (_link.get('status') or {}).get('device_name') and 'device_name' not in controls:controls['device_name']=default_name()
             if controls:payload['controls']=controls
+            sent_at=time.monotonic()
             proc.stdin.write((json.dumps(payload,allow_nan=False)+'\n').encode())
             await proc.stdin.drain()
             raw=await asyncio.wait_for(proc.stdout.readline(),90 if seq==1 and transport=='bluetooth' else 10)
@@ -404,11 +408,11 @@ async def bridge_once(ctx,port,transport='usb'):
             connected=answer.get('acknowledged') is True and isinstance(answer.get('status'),dict)
             if not connected:raise ValueError('Device did not acknowledge usage.')
             delivered=True
-            _link={'connected':connected,'port':port,'status':answer.get('status') if connected else None,'last_ack_at':time.time() if connected else None,'transport':transport,'message':('Wireless usage delivered · device responding' if transport=='bluetooth' else 'Usage delivered · device responding') if connected else 'USB open · no compatible firmware response'}
+            _link={'connected':connected,'port':port,'status':answer.get('status') if connected else None,'last_ack_at':time.time() if connected else None,'delivery_ms':round((time.monotonic()-sent_at)*1000),'transport':transport,'message':('Wireless usage delivered · device responding' if transport=='bluetooth' else 'Usage delivered · device responding') if connected else 'USB open · no compatible firmware response'}
             if connected and controls and answer['status'].get('control_seq')==controls['seq']:
                 if 'pairing_token' in controls:provisioned=True
                 if _pending_controls and _pending_controls.get('seq')==controls['seq']:_pending_controls=None
-            await asyncio.sleep(3)
+            await runtime.wait_for_update(revision)
     except asyncio.CancelledError:
         raise
     except Exception as exc:

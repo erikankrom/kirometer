@@ -3,6 +3,8 @@ import asyncio
 import contextlib
 import datetime as dt
 import math
+import time
+import json
 from pathlib import Path
 import sqlite3
 
@@ -14,6 +16,84 @@ _snapshot = None
 _activity_task = None
 _activity_state = None
 _activity_tracker = ActivityTracker()
+ACTIVITY_INTERVAL = .25
+KEEPALIVE_SECONDS = 5
+_usage_collected_mono = None
+_settings = {'poll_seconds': 300, 'stale_after': 300}
+_usage_reschedule = None
+_update_event = None
+_revision = 0
+
+
+def notify_update():
+    global _revision
+    _revision += 1
+    if _update_event is not None:
+        _update_event.set()
+
+
+async def wait_for_update(revision, timeout=KEEPALIVE_SECONDS):
+    # Clear before checking the revision, so an update during an in-flight write
+    # cannot be lost. All producers and consumers run on this event loop.
+    if _update_event is None:
+        await asyncio.sleep(timeout)
+        return
+    _update_event.clear()
+    if revision != _revision:
+        return
+    try:
+        await asyncio.wait_for(_update_event.wait(), timeout)
+    except asyncio.TimeoutError:
+        pass
+
+
+def current_snapshot(now=None):
+    data = dict(_snapshot or {'available': False, 'stale': True, 'credits': [], 'activity': 'unknown'})
+    now = time.monotonic() if now is None else now
+    elapsed = max(0, now - _usage_collected_mono) if _usage_collected_mono is not None else 0
+    age = data.get('age_seconds')
+    if isinstance(age, (int, float)):
+        data['age_seconds'] = round(age + elapsed)
+        data['stale'] = bool(data.get('stale')) or data['age_seconds'] > _settings['stale_after']
+    data.update(usage_poll_seconds=_settings['poll_seconds'], activity_poll_ms=250,
+                next_usage_poll_seconds=max(0, round(_settings['poll_seconds'] - elapsed)))
+    return data
+
+
+def read_settings(ctx):
+    config = dict(ctx.config)
+    if getattr(ctx, 'data_dir', None):
+        path = Path(ctx.data_dir) / 'config.json'
+        if path.exists():
+            stored = json.loads(path.read_text())
+            if isinstance(stored, dict): config.update(stored)
+    return config
+
+
+async def settings(request, ctx):
+    from aiohttp import web
+    if request.method == 'POST':
+        try:
+            body = await request.json()
+            value = body.get('poll_seconds') if isinstance(body, dict) else None
+            if bounded_integer(value, None, 5, 3600) is None:
+                raise ValueError('Usage refresh must be a whole number from 5 to 3600 seconds.')
+            def save():
+                config = read_settings(ctx)
+                config['poll_seconds'] = value
+                path = Path(ctx.data_dir) / 'config.json'
+                path.parent.mkdir(parents=True, exist_ok=True)
+                temp = path.with_suffix('.tmp')
+                temp.write_text(json.dumps(config, indent=2) + '\n')
+                temp.replace(path)
+            await asyncio.to_thread(save)
+            _settings['poll_seconds'] = value
+            if _usage_reschedule is not None: _usage_reschedule.set()
+        except (ValueError, OSError, TypeError):
+            return web.json_response({'error': 'Usage refresh must be 5–3600 whole seconds and settings must be writable.'}, status=400)
+    return web.json_response({'poll_seconds': _settings['poll_seconds'], 'activity_poll_ms': 250,
+                              'keepalive_seconds': KEEPALIVE_SECONDS}, headers={'Cache-Control': 'no-store'})
+
 
 def bind_activity_state(state):
     global _activity_state
@@ -24,12 +104,15 @@ def bind_activity_state(state):
 
 def refresh_activity():
     if _snapshot is not None:
-        _snapshot.update(_activity_tracker.read(_activity_state))
+        activity = _activity_tracker.read(_activity_state)
+        changed = any(_snapshot.get(k) != v for k, v in activity.items())
+        _snapshot.update(activity)
+        if changed: notify_update()
 
 async def poll_activity():
     while True:
         refresh_activity()
-        await asyncio.sleep(2)
+        await asyncio.sleep(ACTIVITY_INTERVAL)
 
 
 def bounded_integer(value, default, low, high):
@@ -91,18 +174,35 @@ def collect(config):
 
 
 async def poll(ctx):
-    global _snapshot
-    interval = bounded_integer(ctx.config.get('poll_seconds'), 15, 5, 300)
+    global _snapshot, _usage_collected_mono
     while True:
-        _snapshot = await asyncio.to_thread(collect, ctx.config)
+        _usage_reschedule.clear()
+        elapsed = time.monotonic() - _usage_collected_mono
+        delay = max(0, _settings['poll_seconds'] - elapsed)
+        if delay:
+            try:
+                await asyncio.wait_for(_usage_reschedule.wait(), delay)
+                continue
+            except asyncio.TimeoutError:
+                pass
+        config = dict(ctx.config, **_settings)
+        _snapshot = await asyncio.to_thread(collect, config)
+        _usage_collected_mono = time.monotonic()
         refresh_activity()
-        await asyncio.sleep(interval)
+        notify_update()
 
 
 async def on_startup(ctx):
-    global _task, _snapshot, _activity_task
+    global _task, _snapshot, _activity_task, _usage_collected_mono, _settings, _usage_reschedule, _update_event
     await on_shutdown(ctx)
+    config = await asyncio.to_thread(read_settings, ctx)
+    ctx.config.update(config)
+    _settings = {'poll_seconds': bounded_integer(config.get('poll_seconds'), 300, 5, 3600),
+                 'stale_after': bounded_integer(config.get('stale_after'), 300, 0, 86400)}
+    _usage_reschedule = asyncio.Event()
+    _update_event = asyncio.Event()
     _snapshot = await asyncio.to_thread(collect, ctx.config)
+    _usage_collected_mono = time.monotonic()
     _task = asyncio.create_task(poll(ctx), name='kirometer-collector')
     _activity_task = asyncio.create_task(poll_activity(), name='kirometer-activity')
 
@@ -127,7 +227,7 @@ async def on_shutdown(ctx):
 async def snapshot(request, ctx):
     from aiohttp import web
     bind_activity_state(request.app.get('state'))
-    data = _snapshot or await asyncio.to_thread(collect, ctx.config)
+    data = current_snapshot()
     return web.json_response(data, headers={'Cache-Control': 'no-store'}, dumps=__import__('json').dumps)
 
 
@@ -142,4 +242,5 @@ def register_routes(ctx):
     from .devices import route
     return [AppRoute('GET', '/snapshot', snapshot), AppRoute('GET', '/health', health),
             AppRoute('GET', '/devices', route),
+            AppRoute('GET', '/settings', settings), AppRoute('POST', '/settings', settings),
             *[AppRoute('POST', '/devices/' + action, route) for action in ('setup','bundle','flash','status','connect','disconnect','controls','setup_bluetooth','bluetooth_scan','bluetooth_connect')]]

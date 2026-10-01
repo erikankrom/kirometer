@@ -1,6 +1,6 @@
 {
   "name": "kirometer",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "displayName": "Kirometer",
   "description": "A little companion for your Kiro day. See credit usage and activity on your desk, connect over Bluetooth, and make your Kirometer feel like yours. Includes guided USB firmware setup and device controls for macOS.",
   "minKiroCrewVersion": "0.7.2",
@@ -33,7 +33,8 @@
     "api": [
       "/api/apps/kirometer/snapshot",
       "/api/apps/kirometer/health",
-      "/api/apps/kirometer/devices"
+      "/api/apps/kirometer/devices",
+      "/api/apps/kirometer/settings"
     ],
     "network": false,
     "storage": false
@@ -49,8 +50,10 @@
         "poll_seconds": {
           "type": "integer",
           "minimum": 5,
-          "maximum": 300,
-          "default": 15
+          "maximum": 3600,
+          "default": 300,
+          "title": "Usage refresh interval (seconds)",
+          "description": "Billing cache reads only. Activity checks independently every 250 ms."
         },
         "stale_after": {
           "type": "integer",
