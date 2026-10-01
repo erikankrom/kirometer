@@ -1,27 +1,27 @@
 {
   "board": "waveshare-esp32-s3-touch-amoled-2.16",
   "chip": "esp32s3",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "images": [
     {
       "offset": "0x0",
-      "file": "kirometer-0.6.0-bootloader.bin",
+      "file": "kirometer-0.7.0-bootloader.bin",
       "sha256": "b68c1ed33c43a4290375213f24d608c125e31e22880d16d4a5dcba89e083716d"
     },
     {
       "offset": "0x8000",
-      "file": "kirometer-0.6.0-partitions.bin",
+      "file": "kirometer-0.7.0-partitions.bin",
       "sha256": "bd0f7954aca2ef7d925ee21aaa1f3dc8822d1d6ce5cbbd26a135e5886bfff6ce"
     },
     {
       "offset": "0xe000",
-      "file": "kirometer-0.6.0-boot_app0.bin",
+      "file": "kirometer-0.7.0-boot_app0.bin",
       "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
     },
     {
       "offset": "0x10000",
-      "file": "kirometer-0.6.0-firmware.bin",
-      "sha256": "7777a5dc199db9c4cd369d26c5a59d4d136fa2630fce0c378ae004ffea53346c"
+      "file": "kirometer-0.7.0-firmware.bin",
+      "sha256": "963db29bd5947e0ee876e617a7f2bbd691d723c85857143314ced4bbd91ddcb0"
     }
   ]
 }
