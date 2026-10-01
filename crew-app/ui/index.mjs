@@ -37,33 +37,9 @@ const field = (text, control, hint) =>
     control,
     hint && h("span", { className: "hint" }, hint),
   );
-const ghost = () =>
-  h(
-    "div",
-    { className: "device-icon", "aria-hidden": true },
-    h(
-      "svg",
-      { viewBox: "0 0 48 48" },
-      h("path", {
-        d: "M9 38V22a15 15 0 0130 0v18l-7-4-7 5-7-5-9 4z",
-        fill: "currentColor",
-      }),
-      h("ellipse", {
-        cx: 21,
-        cy: 23,
-        rx: 2,
-        ry: 4,
-        fill: "var(--bg-elevated,#fff)",
-      }),
-      h("ellipse", {
-        cx: 31,
-        cy: 23,
-        rx: 2,
-        ry: 4,
-        fill: "var(--bg-elevated,#fff)",
-      }),
-    ),
-  );
+// Same enclosure artwork as the Crew app listing; inherit the host palette.
+const deviceIconSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 96 96\" fill=\"none\" role=\"img\" aria-label=\"Kirometer ghost enclosure\"><g transform=\"translate(52 46)\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M0,-39 C20,-39 29,-34 29,-24 C29,-8 29,12 25,28 C23,34 20,41 16,41 C14,41 12,41 10,41 C6,41 3,36 1,33 C-3,36 -6,41 -10,41 C-12,41 -14,41 -16,41 C-25,41 -26,31 -24,25 C-31,29 -37,26 -37,21 C-37,15 -30,10 -29,-1 C-29,-14 -30,-27 -22,-34 C-16,-38 -7,-39 0,-39 Z\" fill=\"currentColor\" fill-opacity=\".20\" stroke=\"currentColor\" stroke-width=\"6.8\" stroke-opacity=\".85\"/><rect x=\"-22.2\" y=\"-24.2\" width=\"44.4\" height=\"44.4\" rx=\"6.2\" fill=\"var(--km-purple)\" fill-opacity=\".12\" stroke=\"currentColor\" stroke-opacity=\".7\" stroke-width=\"4.8\"/><path d=\"M-14 11H14\" stroke=\"var(--km-purple)\" stroke-opacity=\".28\" stroke-width=\"4.8\"/><path d=\"M-14 11H3\" stroke=\"var(--km-purple)\" stroke-width=\"4.8\"/></g></svg>";
+const deviceIcon = () => h("div", {className:"device-icon", "aria-hidden":true, dangerouslySetInnerHTML:{__html:deviceIconSvg}});
 const statusPill = (online, text) =>
   h(
     "span",
@@ -203,7 +179,7 @@ function DeviceManager({ api, usage }) {
   const [info, setInfo] = useState(null),
     [view, setView] = useState("manage"),
     [browseGallery, setBrowseGallery] = useState(false),
-    [tab, setTab] = useState("display"),
+    [tab, setTab] = useState("screen"),
     [flow, setFlow] = useState(null),
     [step, setStep] = useState(1);
   const [port, setPort] = useState(""),
@@ -620,7 +596,7 @@ function DeviceManager({ api, usage }) {
       h("img",{src:layout.preview,alt:layout.title+" screen preview",width:480,height:480}),
       h("h3",null,layout.title),h("p",null,layout.description),
       linked && h("span",{className:"choice-state"}, (d?.screen_layouts_version || 1) < (layout.capabilityVersion || 1) ? "Requires firmware "+layout.minimumFirmware : d?.screen_layout===layout.id ? "Current face" : "Available")))),
-    linked && button("Customize default face",()=>{setBrowseGallery(false);setView("manage");setTab("display");},running),
+    linked && button("Customize default face",()=>{setBrowseGallery(false);setView("manage");setTab("screen");},running),
     h("p",{className:"gallery-note"},"Previews use sample data. All six faces are included in firmware 0.6.0. Extra-credit meters compare overage with the plan allowance."));
   const updateLog = () => {
     const updates = info?.firmware_updates?.length ? info.firmware_updates : info?.job?.kind === "flash" ? [info.job] : [];
@@ -632,6 +608,61 @@ function DeviceManager({ api, usage }) {
         h("p",{className:"small muted"},job.message),
         h("pre",{className:"firmware-console",tabIndex:0,"aria-label":"Firmware console output"},job.console || "No console output was recorded for this update."))));
   };
+  const saveBar = () =>
+      h(
+        "div",
+        { className: "row spread save" },
+        h(
+          "span",
+          { className: "small muted" },
+          pending
+            ? "Waiting for device confirmation…"
+            : dirty
+              ? "Unsaved changes"
+              : d?.brightness != null
+                ? "Device settings are up to date."
+                : "",
+        ),
+        h(
+          "div",
+          { className: "row" },
+          dirty &&
+            button(
+              "Discard",
+              () => {
+                setDirty(false);
+                setNotice("");
+              },
+              running || !!pending,
+              "quiet",
+            ),
+          button(
+            pending ? "Saving…" : "Save changes",
+            save,
+            running || !controllable || !dirty || !valid || !!pending,
+            "primary",
+          ),
+        ),
+      );
+  const defaultScreen = () => h("div", {className:"stack"},
+    h("fieldset", {disabled:running || !controllable || !!pending},
+          h("fieldset", {disabled: !d?.screen_layouts_supported},
+            h("legend", {className:"gallery-legend"}, "Screen gallery"),
+            h("p", {className:"small muted"}, "Choose your default face. Save applies it now and at startup; swipe on the device to switch faces."),
+            h("div", {className:"layout-gallery"}, ...screenLayouts.filter(layout => (d?.screen_layouts_version || 1)>= (layout.capabilityVersion || 1)).map(layout =>
+              h("label", {key:layout.id,className:"screen-card"+(draft.screen_layout===layout.id?" selected":"")},
+                h("img", {src:layout.preview,alt:layout.title+" screen preview",width:480,height:480}),
+                h("div", {className:"card-title"},
+                  h("input", {type:"radio",name:"kirometer-screen-layout","aria-label":layout.title,value:layout.id,checked:draft.screen_layout===layout.id,onChange:()=>patch("screen_layout",layout.id)}),
+                  h("strong", null,layout.title)),
+                h("p", null,layout.description),
+                h("span", {className:"choice-state"}, draft.screen_layout===layout.id && draft.screen_layout!==(d?.default_screen_layout || d?.screen_layout)?"Selected default · save to apply":d?.screen_layout===layout.id?(d?.default_screen_layout || d?.screen_layout)===layout.id?"Current face · default":"Current face":(d?.default_screen_layout || d?.screen_layout)===layout.id?"Default at startup":"Available"),
+              ))),
+            h("p", {className:"gallery-note"}, !d?.screen_layouts_supported
+              ? "Update to firmware 0.5.9 or later to choose a layout."
+              : "Previews use sample data. Swipe left or right on any device screen to cycle all six faces. Swiping does not change your startup default. Overage meters compare extra credits with the plan allowance."),
+          )),
+    saveBar());
   const display = () =>
     h(
       "div",
@@ -668,22 +699,6 @@ function DeviceManager({ api, usage }) {
             nameBytes > 26
               ? "Use no more than 26 UTF-8 bytes."
               : "Shown when you find your Kirometer over Bluetooth.",
-          ),
-          h("fieldset", {disabled: !d?.screen_layouts_supported},
-            h("legend", {className:"gallery-legend"}, "Screen gallery"),
-            h("p", {className:"small muted"}, "Choose your default face. Save applies it now and at startup; swipe on the device to switch faces."),
-            h("div", {className:"layout-gallery"}, ...screenLayouts.filter(layout => (d?.screen_layouts_version || 1)>= (layout.capabilityVersion || 1)).map(layout =>
-              h("label", {key:layout.id,className:"screen-card"+(draft.screen_layout===layout.id?" selected":"")},
-                h("img", {src:layout.preview,alt:layout.title+" screen preview",width:480,height:480}),
-                h("div", {className:"card-title"},
-                  h("input", {type:"radio",name:"kirometer-screen-layout","aria-label":layout.title,value:layout.id,checked:draft.screen_layout===layout.id,onChange:()=>patch("screen_layout",layout.id)}),
-                  h("strong", null,layout.title)),
-                h("p", null,layout.description),
-                h("span", {className:"choice-state"}, draft.screen_layout===layout.id && draft.screen_layout!==(d?.default_screen_layout || d?.screen_layout)?"Selected default · save to apply":d?.screen_layout===layout.id?(d?.default_screen_layout || d?.screen_layout)===layout.id?"Current face · default":"Current face":(d?.default_screen_layout || d?.screen_layout)===layout.id?"Default at startup":"Available"),
-              ))),
-            h("p", {className:"gallery-note"}, !d?.screen_layouts_supported
-              ? "Update to firmware 0.5.9 or later to choose a layout."
-              : "Previews use sample data. Swipe left or right on any device screen to cycle all six faces. Swiping does not change your startup default. Overage meters compare extra credits with the plan allowance."),
           ),
           field(
             "Brightness · " + Math.round((draft.brightness / 255) * 100) + "%",
@@ -735,41 +750,7 @@ function DeviceManager({ api, usage }) {
         { className: "small muted" },
         "The black screensaver lets your ghost peek in occasionally. Touch the screen or press a top button to wake it.",
       ),
-      h(
-        "div",
-        { className: "row spread save" },
-        h(
-          "span",
-          { className: "small muted" },
-          pending
-            ? "Waiting for device confirmation…"
-            : dirty
-              ? "Unsaved changes"
-              : d?.brightness != null
-                ? "Device settings are up to date."
-                : "",
-        ),
-        h(
-          "div",
-          { className: "row" },
-          dirty &&
-            button(
-              "Discard",
-              () => {
-                setDirty(false);
-                setNotice("");
-              },
-              running || !!pending,
-              "quiet",
-            ),
-          button(
-            pending ? "Saving…" : "Save changes",
-            save,
-            running || !controllable || !dirty || !valid || !!pending,
-            "primary",
-          ),
-        ),
-      ),
+      saveBar(),
     );
   const connection = () =>
     h(
@@ -1138,7 +1119,7 @@ function DeviceManager({ api, usage }) {
                     h(
                       "div",
                       { className: "device-head" },
-                      ghost(),
+                      deviceIcon(),
                       h(
                         "div",
                         { className: "device-title" },
@@ -1169,7 +1150,7 @@ function DeviceManager({ api, usage }) {
                       role: "tablist",
                       "aria-label": "Device settings",
                     },
-                    ...["display", "connection", "firmware"].map((t) =>
+                    ...["screen", "display", "connection", "firmware"].map((t) =>
                       h(
                         "button",
                         {
@@ -1178,7 +1159,7 @@ function DeviceManager({ api, usage }) {
                           role: "tab",
                           tabIndex: tab === t ? 0 : -1,
                           onKeyDown: (event) => {
-                            const tabs = ["display", "connection", "firmware"];
+                            const tabs = ["screen", "display", "connection", "firmware"];
                             const delta =
                               event.key === "ArrowRight"
                                 ? 1
@@ -1195,8 +1176,8 @@ function DeviceManager({ api, usage }) {
                                 event.key === "Home"
                                   ? tabs[0]
                                   : event.key === "End"
-                                    ? tabs[2]
-                                    : tabs[(tabs.indexOf(t) + delta + 3) % 3];
+                                    ? tabs[tabs.length - 1]
+                                    : tabs[(tabs.indexOf(t) + delta + tabs.length) % tabs.length];
                               setTab(next);
                               document
                                 .getElementById("km-tab-" + next)
@@ -1212,7 +1193,9 @@ function DeviceManager({ api, usage }) {
                             setNotice("");
                           },
                         },
-                        t === "display"
+                        t === "screen"
+                          ? "Default screen"
+                          : t === "display"
                           ? "Customize"
                           : t === "connection"
                             ? "Connection"
@@ -1227,7 +1210,9 @@ function DeviceManager({ api, usage }) {
                       id: "km-panel-" + tab,
                       "aria-labelledby": "km-tab-" + tab,
                     },
-                    tab === "display"
+                    tab === "screen"
+                      ? defaultScreen()
+                      : tab === "display"
                       ? display()
                       : tab === "connection"
                         ? connection()
@@ -1237,7 +1222,7 @@ function DeviceManager({ api, usage }) {
               : h(
                   "section",
                   { className: "panel empty" },
-                  ghost(),
+                  deviceIcon(),
                   h(
                     "h2",
                     null,

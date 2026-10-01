@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.9.1
+
+- Move default-face selection into the first Default screen tab.
+- Use the existing Crew app enclosure icon on connected, setup, and empty device cards.
+
 ## 0.9.0
 
 - Add Orbit, Sidekick, Credit ticket, and The big number in firmware 0.6.0.

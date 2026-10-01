@@ -90,6 +90,7 @@ For Usage dashboard, keep the plan card at `(20, 80, 440, 42)`, credit card at `
 ### Crew app
 
 - Separate **set up a new device**, **connect an existing device**, and **manage a connected device**.
+- Device tabs: Default screen, Customize, Connection, Firmware. Keep face selection in Default screen; naming, brightness, and sleep controls stay in Customize. Reuse the Crew listing enclosure icon on device cards, with inherited theme colors.
 - Show the currently connected device and its actual firmware/control capability before customization.
 - Card content needs padding on all four sides, including empty/error states. Use 24 px on desktop, 16 px on narrow layouts.
 - Keep controls and explanatory text grouped with the setting they affect. Avoid large blank gaps between a heading and its controls.
