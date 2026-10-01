@@ -2,6 +2,8 @@
 #include <cassert>
 #include "../firmware/src/ghost_motion.h"
 #include <set>
+#include <limits>
+#include "../firmware/src/usage_layout.h"
 #include <string>
 #include <cmath>
 int main(){
@@ -47,4 +49,16 @@ int main(){
     assert(ghostPose(GhostState::Attention,0).facing==Facing::East);
     assert(ghostPose(GhostState::Error,0).facing==Facing::West);
     assert(ghostPose(GhostState::Complete,2400).facing==Facing::South);
+    auto normal=usageBars(true,126,1000,0);
+    assert(normal.comparable && normal.includedWidth==51 && normal.overageWidth==0);
+    auto extra=usageBars(true,1250,1000,250);
+    assert(extra.usedPercent==125 && extra.overagePercent==25);
+    assert(extra.includedWidth==408 && extra.overageWidth==102);
+    assert(usageBars(true,2500,1000,1500).overageWidth==408);
+    assert(!usageBars(true,10,0,10).comparable);
+    assert(!usageBars(false,10,100,0).comparable);
+    assert(!usageBars(true,std::numeric_limits<float>::quiet_NaN(),100,0).comparable);
+    assert(MINI_REGION.x<=25 && MINI_REGION.x+MINI_REGION.w>=25+46);
+    assert(MINI_REGION.y<=12 && MINI_REGION.y+MINI_REGION.h>=16+56);
+    assert(MINI_REGION.y+MINI_REGION.h<80); // Never touches the plan header.
 }

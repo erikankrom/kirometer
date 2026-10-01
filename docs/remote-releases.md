@@ -21,7 +21,7 @@ Crew supports `gitUrl`, `branch`, and `subdirectory` in an external registry ind
 
 1. This project is hosted in `https://github.com/erikankrom/kirometer`. The workflow derives the repository URL from GitHub; no hostname or personal token is embedded in source.
 2. Change `crew-app/app.json` version. If firmware changed, build with `pio run -d firmware`, then run `python3 scripts/build_firmware_bundle.py`. Commit the generated binary files and manifest as well as app changes.
-3. Publish a **non-prerelease** GitHub release named/tagged `v<app version>` (currently `v0.7.0`). Its tag must point to the versioned source commit.
+3. Publish a **non-prerelease** GitHub release named/tagged `v<app version>` (currently `v0.8.0`). Its tag must point to the versioned source commit.
 4. GitHub Actions validates tests and checksums, attaches `kirometer-crew-app.zip`, and advances `crew-release` using a normal non-force push. Workflow write permission to repository contents must be allowed. Prereleases do not advance the stable channel.
 5. Add that repository URL to Crew's external registries with branch **crew-release**. Install Kirometer from that registry and trust the app. An existing local install must be switched to the registry-backed source using Crew's supported lifecycle UI/API to retain correct update provenance; merely copying files does not establish it.
 

@@ -16,6 +16,7 @@ class PackageTests(unittest.TestCase):
                 names=z.namelist()
                 self.assertTrue(all(not any(p in n for p in ('__pycache__','.app_secret','installed.json','/data/')) for n in names))
                 self.assertIn('kirometer/firmware/GHOST-LICENSE',names)
+                self.assertIn('kirometer/ui/layouts.mjs',names)
                 self.assertNotIn('kirometer/ui/art/banner-light.svg',names)
                 for n in names:self.assertEqual(z.read(n),(app_root/n.removeprefix('kirometer/')).read_bytes())
             build(root/'second.zip')

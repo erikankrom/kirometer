@@ -37,7 +37,7 @@ class USBProtocolTest(unittest.TestCase):
                         last_seq=message['seq']
                         response={'type':'kirometer.ack','protocol':1,'seq':message['seq'],'accepted':True}
                     else:
-                        response={'type':'kirometer.status','protocol':1,'version':'0.5.8','displayed_seq':last_seq,'battery_percent':85,'display_usage_used':625,'display_usage_limit':500,'display_usage_overage':125,'wifi_connected':False,'secret':'must not leave worker'}
+                        response={'type':'kirometer.status','protocol':1,'version':'0.5.8','displayed_seq':last_seq,'battery_percent':85,'screen_layout':'usage','screen_layouts_supported':True,'display_usage_used':625,'display_usage_limit':500,'display_usage_overage':125,'wifi_connected':False,'secret':'must not leave worker'}
                     os.write(master,json.dumps(response).encode()+b'\n')
         thread=threading.Thread(target=device,daemon=True);thread.start()
         proc=subprocess.Popen([str(TOOLS),'crew-app/backend/serial_bridge.py',port],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
@@ -50,6 +50,7 @@ class USBProtocolTest(unittest.TestCase):
             result=json.loads(proc.stdout.readline())
             self.assertTrue(result['acknowledged'])
             self.assertEqual(result['status']['battery_percent'],85)
+            self.assertEqual(result['status']['screen_layout'],'usage')
             self.assertNotIn('secret',result['status'])
             self.assertEqual(result['status']['display_usage_used'],625)
             self.assertEqual(result['status']['display_usage_overage'],125)

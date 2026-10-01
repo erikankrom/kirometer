@@ -11,12 +11,12 @@ def package_files():
     source=ROOT/'crew-app'
     app=json.loads((source/'app.json').read_text())
     manifest=json.loads((source/'firmware/firmware.json').read_text())
-    files={Path('app.json'),Path('README.md'),Path('CHANGELOG.md'),Path('ui/index.mjs'),Path('vendor/checksums.json'),Path('firmware/firmware.json')}
+    files={Path('app.json'),Path('README.md'),Path('CHANGELOG.md'),Path('ui/index.mjs'),Path('ui/layouts.mjs'),Path('vendor/checksums.json'),Path('firmware/firmware.json')}
     files.update(p.relative_to(source) for p in (source/'backend').glob('*.py'))
     for key in ('iconPath','iconPathDark','heroImage','heroImageDark','heroImageDetail','heroImageDetailDark'):
         files.add(Path(app[key]))
     files.update(Path(p) for key in ('screenshots','screenshotsDark') for p in app[key])
-    files.update((Path('ui/art/SOURCES.md'),Path('ui/art/kiro-official.svg')))
+    files.update((Path('ui/art/layout-ghost.svg'),Path('ui/art/layout-usage.svg'),Path('ui/art/SOURCES.md'),Path('ui/art/kiro-official.svg')))
     for image in manifest['images']:
         path=source/'firmware'/image['file']
         if path.parent!=source/'firmware':raise ValueError('Invalid firmware path')
@@ -33,7 +33,8 @@ def package_files():
         if '..' in rel.parts or rel.is_absolute() or path.is_symlink():raise ValueError(f'Unsafe package path: {rel}')
         result[rel]=path.read_bytes()
     result[Path('LICENSE')]=(ROOT/'LICENSE').read_bytes()
-    result[Path('firmware/FONT-LICENSE.txt')]=(ROOT/'firmware/src/fonts/LICENSE.txt').read_bytes()
+    result[Path('firmware/FONT-LICENSE.txt')]=(ROOT/'firmware/assets/fonts/OFL.txt').read_bytes()
+    result[Path('firmware/FONT-SOURCE.md')]=(ROOT/'firmware/assets/fonts/SOURCES.md').read_bytes()
     for name in ('GHOST-LICENSE','GHOST-SOURCE.md'):
         result[Path('firmware')/name]=(ROOT/'firmware'/name).read_bytes()
     return app,manifest,result

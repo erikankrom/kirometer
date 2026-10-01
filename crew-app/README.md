@@ -7,6 +7,7 @@ A little companion for your Kiro day: credits and activity on a small AMOLED des
 ## What it does
 
 - Shows monthly credits, remaining allowance, overage and Crew session activity.
+- Choose Ghost companion or Usage dashboard from a visual gallery; the selection is saved on the device.
 - Connects over Bluetooth LE without joining Wi-Fi.
 - Guides initial USB-C firmware flashing and pairing on macOS.
 - Controls brightness, device name and display sleep; touch wakes the device.

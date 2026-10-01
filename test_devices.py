@@ -59,6 +59,12 @@ class DeviceTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse((path.parent/'flash-staging/test').exists())
 
 class ControlsTest(unittest.TestCase):
+    def test_screen_layout_enum_is_validated(self):
+        for layout in ('ghost','usage'):
+            self.assertEqual(devices.validate_controls({'screen_layout':layout}),{'screen_layout':layout})
+        for value in ('weekly','',None,False,{},[]):
+            with self.assertRaises(ValueError):devices.validate_controls({'screen_layout':value})
+
     def test_display_and_name_validation(self):
         self.assertEqual(devices.validate_controls({'brightness':100,'sleep_mode':'auto','sleep_after':60}),{'brightness':100,'sleep_mode':'auto','sleep_after':60})
         for payload in ({'brightness':True},{'brightness':256},{'sleep_mode':'invalid'},{'sleep_after':1},{'device_name':'x'*27},{'device_name':'bad\nname'},{'device_name':' '},{'device_name':'👻'*7}):

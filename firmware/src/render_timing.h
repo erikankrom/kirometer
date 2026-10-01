@@ -7,6 +7,7 @@ constexpr uint32_t FRAME_INTERVAL_MS = 50;
 struct Rect { int x,y,w,h; };
 // Fixed animation bounds never intersect the status text or the usage controls.
 constexpr Rect HERO_REGION{152,118,176,234};
+constexpr Rect MINI_REGION{18,8,60,66};
 inline Rect peekRegion(unsigned edge) {
     switch(edge%4) {
         case 0:return {0,176,106,128};

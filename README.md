@@ -6,7 +6,7 @@ A Kiro Crew app and ESP32-S3 desk companion with credit usage, activity-aware gh
 
 **Install from Crew:** add `https://github.com/erikankrom/kirometer.git` as an external app registry, choose branch **`crew-release`**, then install and enable **Kirometer**. This private repository requires GitHub read access. See [remote installation and releases](docs/remote-releases.md).
 
-App **0.7.0** · firmware **0.5.8** · macOS device management · Waveshare ESP32-S3-Touch-AMOLED-2.16.
+App **0.8.0** · firmware **0.5.10** · macOS device management · Waveshare ESP32-S3-Touch-AMOLED-2.16.
 
 A desktop Kiro utilization display inspired by [CodexMeter](https://github.com/tomatoeggs/CodexMeter) and its [printed enclosure](https://makerworld.com/en/models/3046835-codexmeter-codex-remaining-usage-running-status-in).
 
@@ -18,7 +18,7 @@ Use the mascot from the installed Kiro app icon: white rounded asymmetric ghost,
 
 The preferred collector is the Kiro Crew app in `crew-app/`. Crew manages background collection and hosts its status page. See [Crew app setup](docs/crew-app.md). The package is installed and enabled locally. Crew session activity is integrated; Bluetooth sync automatically reconnects after temporary interruptions. USB-C handles firmware installation.
 
-The v0.7.0 Crew app includes macOS USB flashing, Bluetooth LE discovery and usage sync, persistent naming, brightness and a touch-wake peeking-ghost screensaver. See [device management](docs/device-management.md). Bluetooth usage, brightness, sleep/wake and renaming were verified on the physical board with 0.5.0; 0.5.3 is flashed and connected over encrypted BLE, and the user confirmed touch-to-wake. Crew session activity detection is implemented; billing freshness follows the existing cache.
+The v0.8.0 Crew app includes macOS USB flashing, Bluetooth LE discovery and usage sync, persistent naming, brightness and a touch-wake peeking-ghost screensaver. See [device management](docs/device-management.md). Bluetooth usage, brightness, sleep/wake and renaming were verified on the physical board with 0.5.0; 0.5.3 is flashed and connected over encrypted BLE, and the user confirmed touch-to-wake. Crew session activity detection is implemented; billing freshness follows the existing cache.
 
 ## Local usage diagnostic
 
@@ -60,3 +60,5 @@ The P1S / 0.4 mm project is `exports/kirometer-bambu.3mf`, with three plates: wh
 ## Remote app releases
 
 [Release packaging and Crew registry setup](docs/remote-releases.md) describes the GitHub release workflow and the `crew-release` distribution branch. [Firmware ghost animation preview](previews/ghost-activity.html) uses the actual directional sprite frames and motion samples.
+
+Design and visual conventions: [DESIGN.md](DESIGN.md).

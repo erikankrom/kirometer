@@ -1,5 +1,16 @@
 # Release notes
 
+## 0.8.0
+
+- Embed Kiro Crew’s Space Grotesk in firmware 0.5.10 with 4-bit antialiasing at four native sizes.
+- Document shared typography, color, layout, icon, motion, and gallery standards in DESIGN.md.
+
+- Visual screen gallery with previews, descriptions, on-device and pending-selection labels.
+- New Usage dashboard: plan banner, credits used/allowance, percentage, reset date, and a red overage meter. Overage is compared with plan allowance, never an invented cap or timed window.
+- Firmware 0.5.10 saves the selected layout across restart and includes it in USB/Bluetooth status.
+- Both layouts retain black backgrounds, bounded ghost animations, touch for metric details and touch-wake screensaver.
+- Devices on older firmware can keep using existing controls; the gallery explains the firmware requirement.
+
 ## 0.7.0
 
 - Restore automatic Bluetooth reconnection with bounded backoff after transient failures. Explicit disconnect cancels retries; a removed bond requires provisioning.

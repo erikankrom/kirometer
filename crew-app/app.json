@@ -1,6 +1,6 @@
 {
   "name": "kirometer",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "displayName": "Kirometer",
   "description": "A little companion for your Kiro day. See credit usage and activity on your desk, connect over Bluetooth, and make your Kirometer feel like yours. Includes guided USB firmware setup and device controls for macOS.",
   "minKiroCrewVersion": "0.7.2",
@@ -85,6 +85,7 @@
     "Reads local Crew billing data with an IDE cache fallback. Screenshot values are illustrative sample data."
   ],
   "highlights": [
+    "Choose a screen from the visual gallery: Ghost companion or a credit-focused Usage dashboard.",
     "Credit usage, remaining allowance, and red overage tracking at a glance.",
     "Bluetooth usage sync and controls without joining corporate Wi-Fi.",
     "Guided firmware setup over USB-C, with device confirmation after flashing.",

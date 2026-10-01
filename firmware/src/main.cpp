@@ -14,13 +14,11 @@
 #include "ghost.h"
 #include "ghost_poses.h"
 #include "ghost_motion.h"
+#include "usage_layout.h"
 #include "render_timing.h"
-#include "fonts/FreeSans12pt7b.h"
-#include "fonts/FreeSans10pt7b.h"
-#include "fonts/FreeSans18pt7b.h"
-#include "fonts/FreeSans24pt7b.h"
+#include "smooth_text.h"
 
-static constexpr char VERSION[] = "0.5.8";
+static constexpr char VERSION[] = "0.5.10";
 static constexpr uint16_t BG=0x0000, SPRITE_BG=0x20E4, PURPLE=0x923F, RED=0xFB2F, WHITE=0xFFFF, MUTED=0xAD55, GREEN=0x6EF3;
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(12,38,4,5,6,7);
 Arduino_CO5300 *panel = new Arduino_CO5300(bus,39,0,480,480,0,0,0,0);
@@ -36,7 +34,7 @@ char input[4096]; size_t count=0; bool overflow=false;
 String activity="Unknown", reset="Unknown", plan="KIRO";
 unsigned long stateSince=0;
 Preferences preferences;
-String pairingToken,deviceName,sleepMode="auto";
+String pairingToken,deviceName,sleepMode="auto",screenLayout="ghost";
 int brightness=180,sleepAfter=120;
 bool sleeping=false;
 uint32_t controlSeq=0;
@@ -126,6 +124,7 @@ String statusJson() {
     char id[17]; snprintf(id,sizeof(id),"%012llx",ESP.getEfuseMac()); doc["device_id"]=id;
     doc["uptime_seconds"]=millis()/1000;doc["bluetooth_connected"]=bleConnected;doc["device_name"]=deviceName;doc["bluetooth_supported"]=true;doc["paired"]=pairingToken.length()>0;
     doc["touch_supported"]=touchOK;doc["touch_events"]=touchEvents;doc["last_wake"]=lastWake;
+    doc["screen_layouts_supported"]=true;doc["screen_layout"]=screenLayout;
     doc["controls_supported"]=true;doc["brightness"]=brightness;doc["sleep_mode"]=sleepMode;doc["sleeping"]=sleeping;doc["sleep_after"]=sleepAfter;doc["control_seq"]=controlSeq;
     doc["usage_connected"]=lastUsage && millis()-lastUsage<30000;
     doc["activity"]=activity;doc["usage_available"]=available; doc["usage_stale"]=stale;
@@ -152,6 +151,10 @@ void handle(const char *line) {
     uint32_t cs=controls["seq"] | 0;
     if(cs && cs!=controlSeq){
         if(controls["brightness"].is<int>()){brightness=constrain(controls["brightness"].as<int>(),5,255);panel->setBrightness(brightness);preferences.putInt("brightness",brightness);}
+        String layout=controls["screen_layout"] | "";
+        if(layout=="ghost" || layout=="usage"){
+            screenLayout=layout;preferences.putString("screen_layout",layout);details=false;lastInteraction=millis();
+        }
         String mode=controls["sleep_mode"] | "";
         if(mode=="awake" || mode=="sleep" || mode=="auto"){sleepMode=mode;preferences.putString("sleep_mode",mode);lastInteraction=millis();}
         if(controls["sleep_after"].is<int>()){sleepAfter=constrain(controls["sleep_after"].as<int>(),30,3600);preferences.putInt("sleep_after",sleepAfter);}
@@ -185,15 +188,12 @@ void handle(const char *line) {
 }
 
 void label(int x,int y,const String &text,int size,uint16_t color=WHITE){
-    gfx->setFont(size>=4?&FreeSans24pt7b:size==3?&FreeSans18pt7b:size==1?&FreeSans10pt7b:&FreeSans12pt7b);
-    gfx->setTextSize(1);gfx->setTextColor(color);
-    gfx->setCursor(x,y+(size>=4?36:size==3?27:size==1?15:18));gfx->print(text);
+    smoothText(gfx->getFramebuffer(),480,480,x,y,text.c_str(),size,color);
 }
 String number(float n){return String(n,n==floor(n)?0:1);}
 
 void centered(int y,const String &text,int size,uint16_t color=WHITE){
-    label(0,0,"",size,color);int16_t x1,y1;uint16_t w,h;
-    gfx->getTextBounds(text,0,0,&x1,&y1,&w,&h);
+    auto bounds=textBounds(text.c_str(),size);int w=bounds.w,x1=bounds.x;
     label((480-w)/2-x1,y,text,size,color);
 }
 void wakeDisplay(const char* source){
@@ -226,9 +226,14 @@ void heroGhost(){
     }
 }
 void rightLabel(int right,int y,const String& text,int size,uint16_t color=WHITE){
-    label(0,0,"",size,color);int16_t x1,y1;uint16_t w,h;
-    gfx->getTextBounds(text,0,0,&x1,&y1,&w,&h);
+    auto bounds=textBounds(text.c_str(),size);int w=bounds.w,x1=bounds.x;
     label(right-w-x1,y,text,size,color);
+}
+void miniGhost(){
+    int bob=lroundf(sinf(frameNow*0.0015707963f)*2);
+    const uint16_t* sprite=frameNow%5000>=4750?GHOST_SOUTH_BLINK:GHOST_SOUTH;
+    for(int y=0;y<56;y++)for(int x=0;x<46;x++)
+        gfx->drawPixel(25+x,14+y+bob,sprite[(y*150/56)*123+x*123/46]);
 }
 void paintAnimation(){
     if(sleeping){
@@ -241,6 +246,8 @@ void paintAnimation(){
             else if(edge==2)peekingGhost(178,480-reveal,0);
             else peekingGhost(178,-GHOST_H+reveal,2);
         }
+    }else if(!details && screenLayout=="usage"){
+        miniGhost();
     }else if(!details){
         heroGhost();
         if(activity=="Working"){
@@ -257,7 +264,7 @@ void draw() {
     bool linked=lastUsage && frameNow-lastUsage<30000;
     sleeping=sleepMode=="sleep" || (sleepMode=="auto" && activity=="Ready" && frameNow-lastInteraction>unsigned(sleepAfter)*1000);
     // Cache only visible state. Sequence acknowledgments still advance for unchanged usage.
-    String key=sleeping?"sleep":String(details)+"|"+linked+"|"+bleConnected+"|"+powerBattery+"|"+powerUSB+"|"+powerCharging+"|"+powerPercent+"|"+activity+"|"+plan+"|"+reset+"|"+available+"|"+stale+"|"+String(used,4)+"|"+String(limit,4)+"|"+String(overage,4);
+    String key=sleeping?"sleep":String(details)+"|"+screenLayout+"|"+linked+"|"+bleConnected+"|"+powerBattery+"|"+powerUSB+"|"+powerCharging+"|"+powerPercent+"|"+activity+"|"+plan+"|"+reset+"|"+available+"|"+stale+"|"+String(used,4)+"|"+String(limit,4)+"|"+String(overage,4);
     static String paintedKey;
     static bool oldPeekVisible=false;
     static unsigned oldEdge=0;
@@ -272,8 +279,9 @@ void draw() {
         bool visible=sleeping && frameNow%20000<5500;
         unsigned edge=(frameNow/20000)%4;
         if(!sleeping && !details){
-            gfx->fillRect(HERO_REGION.x,HERO_REGION.y,HERO_REGION.w,HERO_REGION.h,BG);
-            paintAnimation();flushRegion(HERO_REGION);
+            Rect r=screenLayout=="usage"?MINI_REGION:HERO_REGION;
+            gfx->fillRect(r.x,r.y,r.w,r.h,BG);
+            paintAnimation();flushRegion(r);
         }else if(sleeping && (visible || oldPeekVisible)){
             if(oldPeekVisible && oldEdge!=edge){
                 Rect old=peekRegion(oldEdge);gfx->fillRect(old.x,old.y,old.w,old.h,BG);flushRegion(old);
@@ -292,10 +300,7 @@ void draw() {
     displayedSeq=usageSeq;displayAvailable=available && !sleeping;displayUsed=used;displayLimit=limit;displayOverage=overage;
 }
 
-void paintStatic(bool linked) {
-    gfx->fillScreen(BG);
-    gfx->fillCircle(24,24,5,linked?GREEN:RED);
-    label(38,13,linked?"Connected":"Disconnected",1);
+void paintDeviceIndicators() {
     bool battery=powerBattery;
     bool usb=powerUSB;
     if(usb){ // Plug icon: distinguish USB power from battery charging.
@@ -313,6 +318,49 @@ void paintStatic(bool linked) {
         label(359,10,String(pct)+"%",2);
         if(powerCharging){gfx->fillTriangle(327,13,321,25,327,25,PURPLE);gfx->fillTriangle(326,24,332,24,326,35,PURPLE);}
     }else label(319,13,usb?"USB power":"Power unknown",1);
+ }
+String resetLabel(){
+    int month=reset.substring(5,7).toInt(),day=reset.substring(8,10).toInt();
+    const char* months[]={"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+    if(reset.length()>=10 && reset[4]=='-' && reset[7]=='-' && month>=1 && month<=12 && day>=1 && day<=31)
+        return String("Resets ")+months[month-1]+" "+day+", "+reset.substring(0,4);
+    return "Reset date unavailable";
+}
+void fittedLabel(int x,int y,const String& value,int width,int size,uint16_t color=WHITE){
+    while(size>1 && textBounds(value.c_str(),size).w>width)size--;
+    label(x,y,value,size,color);
+}
+void paintUsageDashboard(bool linked){
+    // Three readable sections; overage compares with the plan allowance, not a fictitious cap.
+    gfx->fillRoundRect(20,80,440,42,10,0x2106);
+    fittedLabel(36,88,plan,408,3,0xC51F);
+    gfx->fillRoundRect(20,136,440,152,12,0x1082);
+    label(36,148,"Plan credits",1,MUTED);
+    UsageBars bars=usageBars(available,used,limit,overage);
+    fittedLabel(36,183,available?number(used)+" / "+number(limit):"-- / --",286,3);
+    rightLabel(444,186,bars.comparable?String(bars.usedPercent,0)+"%":"--%",2,0xC51F);
+    gfx->fillRoundRect(36,234,408,14,7,0x2945);
+    if(bars.includedWidth>0)gfx->fillRoundRect(36,234,max(2,bars.includedWidth),14,min(7,max(1,bars.includedWidth/2)),PURPLE);
+    label(36,260,resetLabel(),1,MUTED);
+    gfx->fillRoundRect(20,302,440,132,12,0x1082);
+    label(36,314,"Overage credits",1,MUTED);
+    fittedLabel(36,343,available?number(overage)+" credits":"Unavailable",408,3,overage>0?RED:WHITE);
+    gfx->fillRoundRect(36,387,408,12,6,0x2945);
+    if(bars.overageWidth>0)gfx->fillRoundRect(36,387,max(2,bars.overageWidth),12,min(6,max(1,bars.overageWidth/2)),RED);
+    String extra=bars.comparable?number(bars.overagePercent)+"% of plan allowance":available?"No allowance to compare":"Usage unavailable";
+    label(36,410,extra,1,MUTED);
+    String connection=linked?"Connected":"Disconnected";
+    if(stale)connection+=" - stale usage";
+    int w=textBounds(connection.c_str(),1).w;
+    int x=(480-w)/2;gfx->fillCircle(x-16,459,5,linked?GREEN:RED);
+    label(x,450,connection,1,linked?GREEN:RED);
+}
+void paintStatic(bool linked) {
+    gfx->fillScreen(BG);
+    paintDeviceIndicators();
+    if(!details && screenLayout=="usage"){paintUsageDashboard(linked);return;}
+    gfx->fillCircle(24,24,5,linked?GREEN:RED);
+    label(38,13,linked?"Connected":"Disconnected",1);
     if(!details){
         uint16_t stateColor=activity=="Error"?RED:activity=="Complete"?GREEN:0xBB5F;
         centered(65,activity,activity=="Needs attention"?3:4,stateColor);
@@ -321,7 +369,7 @@ void paintStatic(bool linked) {
         String badge=plan; if(badge.length()>12)badge=badge.substring(0,11)+"…";
         label(39,370,badge,1,0xC51F);
         String value=available?number(used)+" / "+number(limit):"-- / --";
-        label(0,0,"",3);int16_t bx,by;uint16_t bw,bh;gfx->getTextBounds(value,0,0,&bx,&by,&bw,&bh);
+        int bw=textBounds(value.c_str(),3).w;
         rightLabel(450,365,value,bw<=254?3:2);
         gfx->fillRoundRect(30,408,420,12,6,0x39A7);
         float base=available?min(used,limit):0;
@@ -342,15 +390,14 @@ void paintStatic(bool linked) {
         for(int i=0;i<5;i++){
             label(18,ys[i]+10,names[i],2,MUTED);
             int valueSize=i==4?3:4;
-            int16_t x1,y1;uint16_t w,h;
             // Preserve a readable gap if a large account total needs a smaller font.
-            do{label(0,0,"",valueSize);gfx->getTextBounds(values[i],0,0,&x1,&y1,&w,&h);if(w<=286 || valueSize==2)break;valueSize--;}while(true);
+            while(valueSize>2 && textBounds(values[i].c_str(),valueSize).w>286)valueSize--;
             rightLabel(462,ys[i],values[i],valueSize,i==3?RED:WHITE);
             gfx->drawFastHLine(18,ys[i]+43,444,0x39A7);
         }
         label(18,392,stale?"Usage cache stale":"Usage cache fresh",2,MUTED);
         gfx->drawRoundRect(18,425,444,42,9,PURPLE);
-        centered(436,"Back to ghost",2);
+        centered(436,screenLayout=="usage"?"Back to usage":"Back to ghost",2);
     }
 }
 
@@ -364,6 +411,8 @@ void setup(){
     // Waveshare's 2.16-inch example uses MADCTL 0xA0 for this panel.
     bus->writeC8D8(0x36,0xA0);
     preferences.begin("kirometer",false);
+    screenLayout=preferences.getString("screen_layout","ghost");
+    if(screenLayout!="ghost" && screenLayout!="usage")screenLayout="ghost";
     brightness=constrain(preferences.getInt("brightness",180),5,255);
     sleepMode=preferences.getString("sleep_mode","auto");sleepAfter=preferences.getInt("sleep_after",120);
     panel->setBrightness(brightness);
@@ -404,7 +453,7 @@ void loop(){
             touchEvents++;lastInteraction=millis();
             if(sleeping)wakeDisplay("touch");
             else if(tx[0]>=18 && tx[0]<=462){
-                if(!details && ty[0]>=354 && ty[0]<=461){details=true;draw();}
+                if(!details && (screenLayout=="usage"?(ty[0]>=136 && ty[0]<=434):(ty[0]>=354 && ty[0]<=461))){details=true;draw();}
                 else if(details && ty[0]>=425){details=false;draw();}
             }
         }

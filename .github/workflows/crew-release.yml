@@ -33,6 +33,8 @@ jobs:
           node --check crew-app/ui/index.mjs
           g++ -std=c++17 tests/render_timing_test.cpp -o /tmp/render-test
           /tmp/render-test
+          g++ -std=c++17 tests/smooth_text_test.cpp -o /tmp/font-test
+          /tmp/font-test
       - name: Build runtime package and registry
         env:
           REPOSITORY: ${{ github.repository }}

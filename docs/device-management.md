@@ -85,3 +85,22 @@ The ghost now changes its pose and motion by activity: Ready floats and occasion
 On October 1, firmware 0.5.8 was flashed and verified by esptool on the connected Waveshare board. All six test states were acknowledged and returned matching activity statuses. Partial rendering peaked at 28.430 ms during that tour. Live Crew Bluetooth sync was restored afterward; name, pairing and brightness 127 were retained. These are telemetry and bounded rendering checks, not a camera-based inspection of the physical display.
 
 The app now retries temporary Bluetooth failures at 5, 10, 20, then 30 seconds. Cancel connection stops retries. A removed pairing bond still requires explicit repair. USB status is matched to the current usage sequence so stale responses cannot mask a new state.
+
+
+## Screen gallery and typography (app 0.8.0 / firmware 0.5.10)
+
+Customize → Screen gallery offers Ghost companion and Usage dashboard with visual
+previews. Select a card and save; “On your device” appears only after the device
+acknowledges its chosen layout. Firmware stores the choice in Preferences and
+reports `screen_layout` plus `screen_layouts_supported`. Firmware before 0.5.9
+keeps existing controls but cannot switch layouts.
+
+Usage dashboard shows the plan banner, monthly credit usage and percentage/reset
+date, a separate red overage meter, and connection status. Its overage meter is
+explicitly relative to plan allowance, not an overage cap. Tap either usage card
+for details. The small ghost animates only inside its own black region.
+
+Firmware 0.5.10 embeds Kiro Crew's Space Grotesk at 20/24/36/48 px using 4-bit
+coverage, blended into the RGB565 canvas. It does not change animation timing or
+the display driver. Font source and OFL license are included. See DESIGN.md for
+shared standards and scripts/build_fonts.py to regenerate the atlases.

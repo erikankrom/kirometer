@@ -1,3 +1,4 @@
+import { screenLayouts } from "./layouts.mjs";
 const { react: React, "@kirocrew/app-sdk": sdk } = window.__kirocrew_modules;
 const { createElement: h, useState, useEffect, useRef } = React;
 
@@ -9,6 +10,7 @@ const styles = `
 .km button{appearance:none;font:inherit;font-size:14px;font-weight:600;cursor:pointer;border:1px solid var(--border-strong,var(--border,#d3cbdc));background:var(--bg-elevated,#fff);color:var(--text,#211d26);border-radius:9px;min-height:42px;padding:9px 15px;transition:background .15s,border-color .15s}.km button:hover:not(:disabled){background:var(--bg-hover,#eee8f5)}.km button:active:not(:disabled){transform:translateY(1px)}.km button.primary{background:var(--km-purple);border-color:var(--km-purple);color:white}.km button.primary:hover:not(:disabled){background:#7836dc}.km button.quiet{background:transparent;border-color:transparent}.km button:disabled{opacity:.46;cursor:not-allowed}.km :is(button,input,select,summary):focus-visible{outline:3px solid var(--km-purple);outline-offset:3px}.km button.danger{color:var(--danger,#b4233c)}
 .km .badge{font-size:12px;font-weight:650;border-radius:6px;background:var(--km-tint);padding:4px 9px}.km .status{font-size:13px;display:inline-flex;align-items:center;gap:7px}.km .dot{width:7px;height:7px;border-radius:50%;background:var(--muted,#686170)}.km .online .dot{background:var(--ok,#218445)}.km .notice{padding:12px 15px;background:var(--bg,#f5f3f8);border-left:3px solid var(--km-purple);border-radius:5px;font-size:14px;overflow-wrap:anywhere}.km .notice.error{border-color:var(--danger,#b4233c);color:var(--danger,#b4233c)}.km .notice.success{border-color:var(--ok,#218445)}
 .km .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border,#ddd8e2);margin:24px -24px 20px;padding:0 24px;overflow:auto}.km .tabs button{border:0;border-radius:0;background:transparent;white-space:nowrap;padding:12px 8px;border-bottom:3px solid transparent;min-height:48px}.km .tabs button[aria-selected=true]{border-bottom-color:var(--km-purple);font-weight:750}.km .fields{display:grid;grid-template-columns:1fr 1fr;gap:20px}.km label.field{display:grid;gap:7px;font-size:14px;font-weight:600}.km label.field .hint{font-size:12px;font-weight:400;color:var(--muted-strong,var(--muted,#686170))}.km input:not([type=checkbox]):not([type=radio]):not([type=range]),.km select{font:inherit;font-size:15px;background:var(--bg,#f5f3f8);color:var(--text,#211d26);border:1px solid var(--border-strong,var(--border,#d3cbdc));border-radius:8px;padding:10px 12px;min-height:44px;width:100%}.km input[type=range]{width:100%;accent-color:var(--km-purple);min-height:32px}.km input[type=checkbox],.km input[type=radio]{accent-color:var(--km-purple);width:17px;height:17px;flex-shrink:0}.km fieldset{border:0;margin:0;padding:0;min-width:0}.km .save{border-top:1px solid var(--border,#ddd8e2);padding-top:18px;margin-top:20px}.km .numbers{font-size:32px;letter-spacing:-1px;font-weight:650;line-height:1.25}.km .meter{height:8px;border-radius:8px;background:var(--border,#ddd8e2);overflow:hidden;display:flex}.km .meter .used{background:var(--km-purple)}.km .meter .over{background:var(--danger,#b4233c)}.km dl{margin:0;display:grid;gap:12px}.km dl>div{display:flex;justify-content:space-between;gap:18px;font-size:13px}.km dt{color:var(--muted-strong,var(--muted,#686170))}.km dd{margin:0;text-align:right;overflow-wrap:anywhere}.km .divider{height:1px;background:var(--border,#ddd8e2)}.km .empty{display:grid;justify-items:start;gap:15px}.km .options{display:grid;grid-template-columns:1fr 1fr;gap:14px}.km .choice{text-align:left!important;padding:20px!important;display:grid;gap:6px}.km .choice span{font-weight:400;font-size:13px;color:var(--muted-strong,var(--muted,#686170))}.km .steps{list-style:none;padding:0;margin:20px 0;display:flex;gap:12px;font-size:13px}.km .steps li{flex:1;padding-top:9px;border-top:3px solid var(--border,#ddd8e2);color:var(--muted-strong,var(--muted,#686170))}.km .steps li.current{border-color:var(--km-purple);color:var(--text,#211d26);font-weight:650}.km .device-list{display:grid;gap:8px;padding:0;list-style:none;margin:0}.km .device-list li label{display:flex;gap:12px;align-items:center;padding:14px;border:1px solid var(--border,#ddd8e2);border-radius:9px;cursor:pointer}.km .device-list small{display:block;color:var(--muted-strong,var(--muted,#686170))}.km details summary{font-size:13px;cursor:pointer;color:var(--muted-strong,var(--muted,#686170));padding:8px 0}.km details>div{margin-top:10px}.km .confirm{display:flex;gap:10px;align-items:flex-start;font-size:13px}.km .footer{font-size:12px;color:var(--muted-strong,var(--muted,#686170));margin-top:20px}.km .loading{min-height:170px;display:grid;place-content:center;color:var(--muted,#686170)}
+.km .layout-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-top:12px}.km .screen-card{border:2px solid var(--border,#ddd8e2);border-radius:14px;padding:12px;display:grid;align-content:start;gap:12px;cursor:pointer;transition:border-color .15s,background .15s}.km .screen-card.selected{border-color:var(--km-purple);background:var(--km-tint)}.km .screen-card:has(input:focus-visible){outline:3px solid var(--km-purple);outline-offset:3px}.km .screen-card img{width:100%;height:auto;aspect-ratio:1;display:block;border-radius:9px;background:#000}.km .screen-card .card-title{display:flex;align-items:center;gap:8px;font-size:14px}.km .screen-card .card-title input{margin:0}.km .screen-card p{font-size:12px;color:var(--muted-strong,var(--muted,#686170));line-height:1.5}.km .screen-card .choice-state{font-size:11px;font-weight:600;color:var(--km-purple)}.km fieldset:disabled .screen-card{cursor:default}.km .gallery-legend{font-size:14px;font-weight:650}.km .gallery-note{margin-top:12px;font-size:12px;color:var(--muted-strong,var(--muted,#686170))}
 @media(max-width:950px){.km .layout{grid-template-columns:1fr}.km aside{order:2}.km aside .stack{gap:12px}}@media(max-width:600px){.km{padding:18px}.km .panel{padding:18px}.km .fields,.km .options{grid-template-columns:1fr}.km .tabs{margin-left:-18px;margin-right:-18px;padding:0 18px}.km h1{font-size:28px}.km .device-icon{width:48px;height:48px;flex-basis:48px}.km .steps{gap:8px;font-size:12px}}
 `;
 const num = (n) =>
@@ -218,6 +220,7 @@ function DeviceManager({ api, usage }) {
       brightness: 180,
       sleep_mode: "auto",
       sleep_after: 120,
+      screen_layout: "ghost",
     }),
     [dirty, setDirty] = useState(false);
   const deviceId = useRef(null);
@@ -237,6 +240,7 @@ function DeviceManager({ api, usage }) {
         brightness: d.brightness ?? 180,
         sleep_mode: d.sleep_mode || "auto",
         sleep_after: d.sleep_after ?? 120,
+        screen_layout: d.screen_layout || "ghost",
       });
       deviceId.current = d.device_id;
       if (changed) {
@@ -250,6 +254,7 @@ function DeviceManager({ api, usage }) {
     d?.brightness,
     d?.sleep_mode,
     d?.sleep_after,
+    d?.screen_layout,
     dirty,
     info?.default_name,
   ]);
@@ -324,6 +329,7 @@ function DeviceManager({ api, usage }) {
     draft.sleep_after <= 3600;
   const save = () => {
     const values = { ...draft, device_name: draft.device_name.trim() };
+    if (!d?.screen_layouts_supported) delete values.screen_layout;
     action("controls", values, (r) => {
       setPending({ seq: r.control_seq, values });
       setNotice("Sent to device. Waiting for confirmation…");
@@ -639,6 +645,22 @@ function DeviceManager({ api, usage }) {
             nameBytes > 26
               ? "Use no more than 26 UTF-8 bytes."
               : "Shown when you find your Kirometer over Bluetooth.",
+          ),
+          h("fieldset", {disabled: !d?.screen_layouts_supported},
+            h("legend", {className:"gallery-legend"}, "Screen gallery"),
+            h("p", {className:"small muted"}, "Choose a layout, then save to apply it to your device."),
+            h("div", {className:"layout-gallery"}, ...screenLayouts.map(layout =>
+              h("label", {key:layout.id,className:"screen-card"+(draft.screen_layout===layout.id?" selected":"")},
+                h("img", {src:layout.preview,alt:layout.title+" screen preview",width:480,height:480}),
+                h("div", {className:"card-title"},
+                  h("input", {type:"radio",name:"kirometer-screen-layout","aria-label":layout.title,value:layout.id,checked:draft.screen_layout===layout.id,onChange:()=>patch("screen_layout",layout.id)}),
+                  h("strong", null,layout.title)),
+                h("p", null,layout.description),
+                h("span", {className:"choice-state"}, d?.screen_layout===layout.id?"On your device":draft.screen_layout===layout.id?"Selected · save to apply":"Available"),
+              ))),
+            h("p", {className:"gallery-note"}, !d?.screen_layouts_supported
+              ? "Update to firmware 0.5.9 or later to choose a layout."
+              : "Previews use sample data. The overage meter compares extra credits with the plan allowance; it is not a separate limit."),
           ),
           field(
             "Brightness · " + Math.round((draft.brightness / 255) * 100) + "%",
