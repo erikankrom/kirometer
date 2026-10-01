@@ -10,9 +10,13 @@ import uuid
 import secrets
 import getpass
 import os
+import re
+import codecs
 
 BOARD = 'waveshare-esp32-s3-touch-amoled-2.16'
 _job = None
+_history = []
+_history_path = None
 _task = None
 _lock = asyncio.Lock()
 _link_task = None
@@ -24,7 +28,7 @@ _link = {"connected": False, "port": None, "status": None, "message": "No device
 def validate_controls(payload):
     out={}
     if 'screen_layout' in payload:
-        if payload['screen_layout'] not in ('ghost','usage'):raise ValueError('Choose Ghost companion or Usage dashboard.')
+        if payload['screen_layout'] not in ('ghost','usage','orbit','sidekick','ticket','big_number'):raise ValueError('Choose an available screen layout.')
         out['screen_layout']=payload['screen_layout']
     if 'brightness' in payload:
         n=payload['brightness']
@@ -117,13 +121,53 @@ def validate_bundle(path):
     return {'version':version,'board':BOARD,'images':result}
 
 
-async def command(argv, timeout=180):
+def load_history(ctx):
+    global _history_path, _history, _job
+    path = Path(ctx.data_dir) / 'firmware-updates.json'
+    if _history_path == path:
+        return
+    _history_path = path
+    try:
+        stored = json.loads(path.read_text())
+        _history = stored[:8] if isinstance(stored, list) else []
+    except (OSError, ValueError):
+        _history = []
+    for job in _history:
+        if job.get('state') == 'running':
+            job.update(state='interrupted', message='App restarted during update. Check device status before retrying.')
+    if _history:
+        _job = _history[0]
+
+
+def persist_history():
+    if _history_path is None:
+        return
+    _history_path.parent.mkdir(parents=True, exist_ok=True)
+    temp = _history_path.with_suffix('.tmp')
+    temp.write_text(json.dumps(_history))
+    temp.replace(_history_path)
+
+
+def append_console(text):
+    if not _job or _job.get('kind') != 'flash':
+        return
+    # Store plain console output, with bounded retention and no terminal controls.
+    text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text).replace('\r', '\n')
+    text = ''.join(c for c in text if c in '\n\t' or ord(c) >= 32)
+    _job['console'] = (_job.get('console', '') + text)[-24000:]
+    persist_history()
+
+
+async def command(argv, timeout=180, on_output=None):
     proc = await asyncio.create_subprocess_exec(*map(str,argv), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
     output = bytearray()
+    decoder = codecs.getincrementaldecoder("utf-8")("replace")
     async def drain():
         while chunk := await proc.stdout.read(4096):
+            if on_output: on_output(decoder.decode(chunk))
             output.extend(chunk)
             del output[:-16000]
+        if on_output: on_output(decoder.decode(b"", final=True))
         return await proc.wait()
     try:
         code = await asyncio.wait_for(drain(),timeout)
@@ -172,7 +216,8 @@ async def worker(kind, ctx, port=None, bundle=None):
                     file = stage / f'{index}.bin'
                     file.write_bytes(raw)
                     argv.extend([hex(image['offset']),file])
-                await command(argv,180)
+                append_console("Writing verified firmware images…\n")
+                await command(argv,180,on_output=append_console)
                 _job.update(state='complete',message='Flash verified by esptool. Check device status to confirm firmware boot.',version=bundle['version'])
             finally:
                 shutil.rmtree(stage,ignore_errors=True)
@@ -183,6 +228,9 @@ async def worker(kind, ctx, port=None, bundle=None):
         _job.update(state='failed',message=str(exc) if isinstance(exc,ValueError) else 'Device operation failed.')
     finally:
         _job['finished_at'] = time.time()
+        if kind == 'flash':
+            append_console('\n' + _job['message'] + '\n')
+            persist_history()
 
 
 async def start(kind,ctx,port=None,bundle=None):
@@ -190,12 +238,18 @@ async def start(kind,ctx,port=None,bundle=None):
     if sys.platform != 'darwin':
         raise ValueError('Device operations currently support macOS only.')
     async with _lock:
+        load_history(ctx)
         await disconnect()
         if _task and not _task.done():
             raise ValueError('Another device operation is already running.')
         if kind == 'flash' and not tools_ready(ctx):
             raise ValueError('Set up device tools first.')
         _job = {'id':uuid.uuid4().hex,'kind':kind,'state':'running','port':port,'started_at':time.time(),'message':'Setting up tools…' if kind in ('setup','setup_bluetooth') else 'Flashing firmware…'}
+        if kind == 'flash':
+            _job.update(version=bundle['version'], console='Preparing firmware update…\n')
+            _history.insert(0, _job)
+            del _history[8:]
+            persist_history()
         _task = asyncio.create_task(worker(kind,ctx,port,bundle))
         return dict(_job)
 
@@ -219,7 +273,8 @@ async def route(request,ctx):
     action = request.path.rsplit('/',1)[-1]
     try:
         if request.method == 'GET':
-            return web.json_response({'supported':sys.platform=='darwin','ports':ports(),'tools_ready':tools_ready(ctx),'bluetooth_ready':bluetooth_ready(ctx),'default_name':default_name(),'job':_job,'link':_link,'bundled_firmware':str(Path(__file__).resolve().parents[1] / 'firmware/firmware.json')},headers={'Cache-Control':'no-store'})
+            load_history(ctx)
+            return web.json_response({'supported':sys.platform=='darwin','ports':ports(),'tools_ready':tools_ready(ctx),'bluetooth_ready':bluetooth_ready(ctx),'default_name':default_name(),'job':_job,'firmware_updates':_history,'link':_link,'bundled_firmware':str(Path(__file__).resolve().parents[1] / 'firmware/firmware.json')},headers={'Cache-Control':'no-store'})
         payload = await request.json()
         if not isinstance(payload,dict):
             raise ValueError('Device request must be a JSON object.')
