@@ -13,7 +13,7 @@ const connected = () => ({
     device_name: "Alex’s Kirometer",
     version: "0.6.0",
     controls_supported: true,
-    sounds_supported: true, audio_ready:true, sound_enabled:false, sound_preset:"chime",
+    test_sound_supported:true, last_sound_test_seq:0, sounds_supported: true, audio_ready:true, sound_enabled:false, sound_preset:"chime",
     screen_layouts_supported: true, screen_layouts_version: 2,
     screen_layout: "ghost", default_screen_layout: "ghost",
     bluetooth_supported: true,
@@ -68,7 +68,9 @@ const api = {
     if (op === "controls") {
       const seq = ++sequence;
       setTimeout(() => {
-        Object.assign(info.link.status, body, { control_seq: seq });
+        if(body.test_sound) info.link.status.last_sound_test_seq=seq;
+        else Object.assign(info.link.status, body);
+        info.link.status.control_seq=seq;
         if (body.screen_layout) info.link.status.default_screen_layout=body.screen_layout;
         info.link.status.sleeping = body.sleep_mode === "sleep";
       }, 600);

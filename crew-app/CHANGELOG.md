@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.11.1
+
+- Preview any selected tone using Play test sound in Customize, including when notification sounds are off.
+- Firmware 0.7.1 supports one-shot test commands without changing saved sound preferences.
+- Confirm the device accepted the test and preserve unsaved form edits.
+
 ## 0.11.0
 
 - Opt-in device notification sounds: Chime, Ding, Blip, Pop and Pulse from Kiro Crew.

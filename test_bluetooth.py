@@ -50,3 +50,29 @@ class SoundControlTests(unittest.TestCase):
             with self.assertRaises(ValueError):validate({'sound_enabled':value})
         for value in ('none','unknown',1,None):
             with self.assertRaises(ValueError):validate({'sound_preset':value})
+
+class TestSoundRequestTests(unittest.IsolatedAsyncioTestCase):
+    def test_preview_validation_is_separate_from_saved_settings(self):
+        validate=test_devices.devices.validate_controls
+        self.assertEqual(validate({'test_sound':'pop'}),{'test_sound':'pop'})
+        for payload in ({'test_sound':'invalid'},{'test_sound':True},{'test_sound':'chime','sound_enabled':True}):
+            with self.assertRaises(ValueError):validate(payload)
+
+    async def test_preview_requires_audio_capability_and_preserves_other_commands(self):
+        from unittest.mock import AsyncMock
+        d=test_devices.devices
+        status={'controls_supported':True,'test_sound_supported':True,'audio_ready':True,'sound_enabled':False,'sound_preset':'chime'}
+        request=types.SimpleNamespace(app={},method='POST',path='/devices/controls',json=AsyncMock(return_value={'test_sound':'pulse'}))
+        with patch.object(d,'_link',{'connected':True,'status':status}),patch.object(d,'_pending_controls',None),patch.object(d,'_control_seq',100):
+            for key in ('test_sound_supported','audio_ready'):
+                status[key]=False
+                self.assertEqual((await d.route(request,None)).status,400)
+                self.assertIsNone(d._pending_controls)
+                status[key]=True
+            reply=await d.route(request,None)
+            self.assertEqual(reply.status,202)
+            self.assertEqual(d._pending_controls,{'test_sound':'pulse','seq':101})
+            self.assertFalse(status['sound_enabled'])
+            self.assertEqual(status['sound_preset'],'chime')
+            self.assertEqual((await d.route(request,None)).status,400)
+            self.assertEqual(d._pending_controls['seq'],101)

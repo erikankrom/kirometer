@@ -27,6 +27,10 @@ _link = {"connected": False, "port": None, "status": None, "message": "No device
 
 def validate_controls(payload):
     out={}
+    if 'test_sound' in payload:
+        if payload['test_sound'] not in ('chime','ding','blip','pop','pulse'):raise ValueError('Choose a supported test sound.')
+        if len(payload)!=1:raise ValueError('Test a sound separately from saving settings.')
+        out['test_sound']=payload['test_sound']
     if 'sound_enabled' in payload:
         if not isinstance(payload['sound_enabled'],bool):raise ValueError('Sound enabled must be true or false.')
         out['sound_enabled']=payload['sound_enabled']
@@ -296,6 +300,11 @@ async def route(request,ctx):
             controls=validate_controls(payload)
             if any(k in controls for k in ('sound_enabled','sound_preset')) and not (_link.get('status') or {}).get('sounds_supported'):
                 raise ValueError('Update to firmware 0.7.0 or later for notification sounds.')
+            if 'test_sound' in controls:
+                status=_link.get('status') or {}
+                if not status.get('test_sound_supported'):raise ValueError('Update to firmware 0.7.1 or later to test sounds.')
+                if not status.get('audio_ready'):raise ValueError('Device audio is unavailable. Restart your Kirometer and try again.')
+                if _pending_controls:raise ValueError('Wait for the current device command to finish.')
             _control_seq+=1;controls['seq']=_control_seq;_pending_controls=controls
             from .runtime import notify_update
             notify_update()

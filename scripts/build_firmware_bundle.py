@@ -6,7 +6,7 @@ import shutil
 ROOT=Path(__file__).resolve().parents[1]
 source=ROOT/'firmware/.pio/build/waveshare_amoled_216'
 target=ROOT/'crew-app/firmware';target.mkdir(parents=True,exist_ok=True)
-version='0.7.0';images=[]
+version='0.7.1';images=[]
 for offset,name in ((0,'bootloader.bin'),(0x8000,'partitions.bin'),(0xe000,'boot_app0.bin'),(0x10000,'firmware.bin')):
     file=target/f'kirometer-{version}-{name}'
     if name=='boot_app0.bin':file.write_bytes((source/'firmware.factory.bin').read_bytes()[0xe000:0x10000])

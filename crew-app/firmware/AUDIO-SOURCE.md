@@ -6,6 +6,10 @@ Only **Needs Response** is supported: Crew's `waiting_input` health state. A new
 
 Sound selection and enablement travel over the existing authenticated BLE/USB usage contract (`controls.sound_enabled`, `controls.sound_preset`). The payload also includes `needs_response`, `response_event`, and `notification_baseline`. No conversation content or session IDs leave Crew. Firmware consumes IDs even when muted; enabling does not play an old event. Status exposes `sounds_supported`, `audio_ready`, saved settings and a `sound_events` dispatch counter. The counter is not proof that a physical speaker was audible.
 
+## Test playback
+
+App 0.11.1 / firmware 0.7.1 add **Play test sound** under the selector. This previews the currently selected tone even with alerts disabled, without saving the selection or enabling alerts. Tests use `controls.test_sound` and the existing sequenced command acknowledgement. `test_sound_supported` gates older firmware; `last_sound_test_seq` confirms dispatch. Repeating a command sequence does not play it twice. Audio initialization failure disables testing. The UI preserves unsaved edits after a test.
+
 ## Sound source
 
 Kiro Crew's installed frontend, inspected 2026-10-01, synthesizes its sounds rather than shipping recordings. Preset note frequencies, timing, relative gains and envelope behavior were transcribed from `MemoryTab-e91XvJr7.js` in the installed application. Kirometer's independently implemented 16 kHz PCM synthesizer reproduces those presets: sine oscillators, 5 ms eased attack/release, decay to 1% amplitude, preset compensation, and Crew's default 35% volume curve. Additional mixer headroom and a moderate codec gain suit the small speaker. Actual timbre/loudness differs by speaker. No Crew JavaScript bundle or recordings are redistributed.

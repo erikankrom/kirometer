@@ -23,7 +23,7 @@
 #include "notification_audio.h"
 #include "response_alert.h"
 
-static constexpr char VERSION[] = "0.7.0";
+static constexpr char VERSION[] = "0.7.1";
 static constexpr uint16_t BG=0x0000, SPRITE_BG=0x20E4, PURPLE=0x923F, RED=0xFB2F, WHITE=0xFFFF, MUTED=0xAD55, GREEN=0x6EF3;
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(12,38,4,5,6,7);
 Arduino_CO5300 *panel = new Arduino_CO5300(bus,39,0,480,480,0,0,0,0);
@@ -45,7 +45,7 @@ bool sleeping=false;
 bool soundEnabled=false,audioOK=false;
 String soundPreset="chime";
 ResponseAlert responseAlert;
-uint32_t soundEvents=0;
+uint32_t soundEvents=0,lastSoundTestSeq=0;
 uint32_t controlSeq=0,swipeEvents=0,faceHintUntil=0;
 void compactFaceGhost();
 void paintFaceHint();
@@ -137,7 +137,7 @@ String statusJson() {
     doc["touch_supported"]=touchOK;doc["touch_events"]=touchEvents;doc["last_wake"]=lastWake;
     doc["default_screen_layout"]=defaultScreenLayout;doc["screen_layouts_version"]=2;doc["swipe_events"]=swipeEvents;doc["screen_layouts_supported"]=true;doc["screen_layout"]=screenLayout;
     doc["controls_supported"]=true;doc["brightness"]=brightness;doc["sleep_mode"]=sleepMode;doc["sleeping"]=sleeping;doc["sleep_after"]=sleepAfter;doc["control_seq"]=controlSeq;
-    doc["sounds_supported"]=true;doc["audio_ready"]=audioOK;doc["sound_enabled"]=soundEnabled;doc["sound_preset"]=soundPreset;doc["sound_events"]=soundEvents;
+    doc["test_sound_supported"]=true;doc["last_sound_test_seq"]=lastSoundTestSeq;doc["sounds_supported"]=true;doc["audio_ready"]=audioOK;doc["sound_enabled"]=soundEnabled;doc["sound_preset"]=soundPreset;doc["sound_events"]=soundEvents;
     doc["usage_connected"]=lastUsage && millis()-lastUsage<30000;
     doc["activity"]=activity;doc["usage_available"]=available; doc["usage_stale"]=stale;
     doc["displayed_seq"]=displayedSeq;doc["display_usage_available"]=displayAvailable;
@@ -181,6 +181,9 @@ void handle(const char *line) {
         bool validName=name.length()>0 && name.length()<=26;
         for(size_t i=0;i<name.length();i++)if((uint8_t)name[i]<32 || name[i]==127)validName=false;
         if(validName){deviceName=name;preferences.putString("device_name",name);advertiseName();}
+        String testSound=controls["test_sound"] | "";
+        int testPreset=NotificationSound::index(testSound.c_str());
+        if(audioOK && testPreset>=0){playNotificationSound(testPreset);soundEvents++;lastSoundTestSeq=cs;}
         controlSeq=cs;
     }
     JsonVariant c=doc["credits"][0];
