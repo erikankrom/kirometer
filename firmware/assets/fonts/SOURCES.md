@@ -8,7 +8,7 @@ Original unmodified Regular and Bold TTFs downloaded from:
 - License: OFL.txt alongside these files (SIL Open Font License 1.1).
 
 Generated 4-bit bitmap subsets cover printable ASCII plus U+2026 in 20/24 px
-Regular and 36/48 px Bold. Regenerate with scripts/build_fonts.py (Pillow 12.3.0).
+Regular and 36/48/64/80/120 px Bold. Regenerate with scripts/build_fonts.py (Pillow 12.3.0).
 See ../../src/smooth_text.h for RGB565 blending. No LVGL runtime is required.
 
 Kiro website AWS Diatype assets are not included: their embedded font license

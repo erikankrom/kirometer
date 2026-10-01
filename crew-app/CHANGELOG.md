@@ -1,5 +1,13 @@
 # Release notes
 
+## 0.9.0
+
+- Add Orbit, Sidekick, Credit ticket, and The big number in firmware 0.6.0.
+- Swipe through all six faces from any face or detail view; Crew controls the separate startup default.
+- Embed larger Space Grotesk metrics and antialiased Lucide status icons.
+- Browse every screen preview before connecting a device.
+- Show live firmware console output and retain the last eight update results locally.
+
 ## 0.8.0
 
 - Embed Kiro Crew’s Space Grotesk in firmware 0.5.10 with 4-bit antialiasing at four native sizes.

@@ -46,7 +46,7 @@ class DeviceTests(unittest.IsolatedAsyncioTestCase):
         path,_=self.bundle();bundle=devices.validate_bundle(path)
         ctx=types.SimpleNamespace(data_dir=path.parent)
         devices._job={'id':'test'}
-        async def fake(argv,timeout):
+        async def fake(argv,timeout,on_output=None):
             self.assertEqual(argv[argv.index('--chip')+1],'esp32s3')
             self.assertNotIn('--force',argv)
             self.assertNotIn('--erase-all',argv)
@@ -60,7 +60,7 @@ class DeviceTests(unittest.IsolatedAsyncioTestCase):
 
 class ControlsTest(unittest.TestCase):
     def test_screen_layout_enum_is_validated(self):
-        for layout in ('ghost','usage'):
+        for layout in ('ghost','usage','orbit','sidekick','ticket','big_number'):
             self.assertEqual(devices.validate_controls({'screen_layout':layout}),{'screen_layout':layout})
         for value in ('weekly','',None,False,{},[]):
             with self.assertRaises(ValueError):devices.validate_controls({'screen_layout':value})
@@ -118,3 +118,26 @@ class ReconnectTests(unittest.IsolatedAsyncioTestCase):
             retry,delivered=await devices.bridge_once(ctx,'device','bluetooth')
         self.assertFalse(retry);self.assertFalse(delivered)
         proc.kill.assert_called_once();proc.wait.assert_awaited_once()
+
+class FirmwareConsoleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_failed_command_keeps_streamed_output(self):
+        chunks=[]
+        with self.assertRaises(ValueError):
+            await devices.command([__import__('sys').executable,'-u','-c','print("Connecting..."); print("port unavailable"); exit(1)'],on_output=chunks.append)
+        self.assertIn('port unavailable',''.join(chunks))
+
+    async def test_console_is_bounded_persisted_and_recovers_interruption(self):
+        with tempfile.TemporaryDirectory() as root:
+            with patch.object(devices,'_history_path',None),patch.object(devices,'_history',[]),patch.object(devices,'_job',None):
+                ctx=types.SimpleNamespace(data_dir=root)
+                devices.load_history(ctx)
+                devices._job={'id':'test','kind':'flash','state':'running','console':''}
+                devices._history.append(devices._job)
+                devices.append_console('x'*25000+'\x1b[31mError\x1b[0m\rFailed\n')
+                self.assertEqual(len(devices._job['console']),24000)
+                self.assertNotIn('\x1b',devices._job['console'])
+                self.assertTrue(devices._job['console'].endswith('Error\nFailed\n'))
+                devices._history_path=None
+                devices.load_history(ctx)
+                self.assertEqual(devices._job['state'],'interrupted')
+                self.assertIn('Failed',devices._job['console'])

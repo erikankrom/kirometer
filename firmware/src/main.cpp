@@ -17,8 +17,10 @@
 #include "usage_layout.h"
 #include "render_timing.h"
 #include "smooth_text.h"
+#include "face_navigation.h"
+#include "lucide_icons.h"
 
-static constexpr char VERSION[] = "0.5.10";
+static constexpr char VERSION[] = "0.6.0";
 static constexpr uint16_t BG=0x0000, SPRITE_BG=0x20E4, PURPLE=0x923F, RED=0xFB2F, WHITE=0xFFFF, MUTED=0xAD55, GREEN=0x6EF3;
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(12,38,4,5,6,7);
 Arduino_CO5300 *panel = new Arduino_CO5300(bus,39,0,480,480,0,0,0,0);
@@ -34,10 +36,12 @@ char input[4096]; size_t count=0; bool overflow=false;
 String activity="Unknown", reset="Unknown", plan="KIRO";
 unsigned long stateSince=0;
 Preferences preferences;
-String pairingToken,deviceName,sleepMode="auto",screenLayout="ghost";
+String pairingToken,deviceName,sleepMode="auto",screenLayout="ghost",defaultScreenLayout="ghost";
 int brightness=180,sleepAfter=120;
 bool sleeping=false;
-uint32_t controlSeq=0;
+uint32_t controlSeq=0,swipeEvents=0,faceHintUntil=0;
+void compactFaceGhost();
+void paintFaceHint();
 unsigned long lastInteraction=0;
 uint32_t usageSeq=0, displayedSeq=0;
 bool displayAvailable=false;float displayUsed=0,displayLimit=0,displayOverage=0;
@@ -124,7 +128,7 @@ String statusJson() {
     char id[17]; snprintf(id,sizeof(id),"%012llx",ESP.getEfuseMac()); doc["device_id"]=id;
     doc["uptime_seconds"]=millis()/1000;doc["bluetooth_connected"]=bleConnected;doc["device_name"]=deviceName;doc["bluetooth_supported"]=true;doc["paired"]=pairingToken.length()>0;
     doc["touch_supported"]=touchOK;doc["touch_events"]=touchEvents;doc["last_wake"]=lastWake;
-    doc["screen_layouts_supported"]=true;doc["screen_layout"]=screenLayout;
+    doc["default_screen_layout"]=defaultScreenLayout;doc["screen_layouts_version"]=2;doc["swipe_events"]=swipeEvents;doc["screen_layouts_supported"]=true;doc["screen_layout"]=screenLayout;
     doc["controls_supported"]=true;doc["brightness"]=brightness;doc["sleep_mode"]=sleepMode;doc["sleeping"]=sleeping;doc["sleep_after"]=sleepAfter;doc["control_seq"]=controlSeq;
     doc["usage_connected"]=lastUsage && millis()-lastUsage<30000;
     doc["activity"]=activity;doc["usage_available"]=available; doc["usage_stale"]=stale;
@@ -152,8 +156,8 @@ void handle(const char *line) {
     if(cs && cs!=controlSeq){
         if(controls["brightness"].is<int>()){brightness=constrain(controls["brightness"].as<int>(),5,255);panel->setBrightness(brightness);preferences.putInt("brightness",brightness);}
         String layout=controls["screen_layout"] | "";
-        if(layout=="ghost" || layout=="usage"){
-            screenLayout=layout;preferences.putString("screen_layout",layout);details=false;lastInteraction=millis();
+        if(validLayout(layout.c_str())){
+            screenLayout=defaultScreenLayout=layout;preferences.putString("screen_layout",layout);details=false;lastInteraction=millis();
         }
         String mode=controls["sleep_mode"] | "";
         if(mode=="awake" || mode=="sleep" || mode=="auto"){sleepMode=mode;preferences.putString("sleep_mode",mode);lastInteraction=millis();}
@@ -246,6 +250,8 @@ void paintAnimation(){
             else if(edge==2)peekingGhost(178,480-reveal,0);
             else peekingGhost(178,-GHOST_H+reveal,2);
         }
+    }else if(!details && faceIndex(screenLayout.c_str())>=0){
+        compactFaceGhost();
     }else if(!details && screenLayout=="usage"){
         miniGhost();
     }else if(!details){
@@ -264,7 +270,8 @@ void draw() {
     bool linked=lastUsage && frameNow-lastUsage<30000;
     sleeping=sleepMode=="sleep" || (sleepMode=="auto" && activity=="Ready" && frameNow-lastInteraction>unsigned(sleepAfter)*1000);
     // Cache only visible state. Sequence acknowledgments still advance for unchanged usage.
-    String key=sleeping?"sleep":String(details)+"|"+screenLayout+"|"+linked+"|"+bleConnected+"|"+powerBattery+"|"+powerUSB+"|"+powerCharging+"|"+powerPercent+"|"+activity+"|"+plan+"|"+reset+"|"+available+"|"+stale+"|"+String(used,4)+"|"+String(limit,4)+"|"+String(overage,4);
+    bool hint=!sleeping && !details && int32_t(faceHintUntil-frameNow)>0;
+    String key=sleeping?"sleep":String(details)+"|"+hint+"|"+screenLayout+"|"+linked+"|"+bleConnected+"|"+powerBattery+"|"+powerUSB+"|"+powerCharging+"|"+powerPercent+"|"+activity+"|"+plan+"|"+reset+"|"+available+"|"+stale+"|"+String(used,4)+"|"+String(limit,4)+"|"+String(overage,4);
     static String paintedKey;
     static bool oldPeekVisible=false;
     static unsigned oldEdge=0;
@@ -274,12 +281,12 @@ void draw() {
         paintedKey=key;
         gfx->fillScreen(BG);
         if(!sleeping)paintStatic(linked);
-        paintAnimation();gfx->flush();fullFrames++;
+        paintAnimation();if(hint)paintFaceHint();gfx->flush();fullFrames++;
     }else if(frameNow-lastPaint>=FRAME_INTERVAL_MS){
         bool visible=sleeping && frameNow%20000<5500;
         unsigned edge=(frameNow/20000)%4;
         if(!sleeping && !details){
-            Rect r=screenLayout=="usage"?MINI_REGION:HERO_REGION;
+            Rect r=faceRegion(screenLayout.c_str());
             gfx->fillRect(r.x,r.y,r.w,r.h,BG);
             paintAnimation();flushRegion(r);
         }else if(sleeping && (visible || oldPeekVisible)){
@@ -300,25 +307,8 @@ void draw() {
     displayedSeq=usageSeq;displayAvailable=available && !sleeping;displayUsed=used;displayLimit=limit;displayOverage=overage;
 }
 
-void paintDeviceIndicators() {
-    bool battery=powerBattery;
-    bool usb=powerUSB;
-    if(usb){ // Plug icon: distinguish USB power from battery charging.
-        gfx->drawFastVLine(289,14,6,GREEN);gfx->drawFastVLine(299,14,6,GREEN);
-        gfx->drawRoundRect(287,20,15,10,3,GREEN);gfx->drawFastVLine(294,30,5,GREEN);
-    }
-    if(bleConnected){
-        gfx->drawLine(250,12,250,36,WHITE);gfx->drawLine(250,12,258,20,WHITE);gfx->drawLine(258,20,242,32,WHITE);
-        gfx->drawLine(242,16,258,28,WHITE);gfx->drawLine(258,28,250,36,WHITE);
-    }
-    if(battery){
-        int pct=powerPercent;
-        gfx->drawRoundRect(316,16,28,16,3,WHITE);gfx->fillRect(344,21,3,6,WHITE);
-        gfx->fillRect(319,19,max(0,min(22,pct*22/100)),10,powerCharging?GREEN:WHITE);
-        label(359,10,String(pct)+"%",2);
-        if(powerCharging){gfx->fillTriangle(327,13,321,25,327,25,PURPLE);gfx->fillTriangle(326,24,332,24,326,35,PURPLE);}
-    }else label(319,13,usb?"USB power":"Power unknown",1);
- }
+void powerIcons(int y);
+void paintDeviceIndicators(){powerIcons(10);}
 String resetLabel(){
     int month=reset.substring(5,7).toInt(),day=reset.substring(8,10).toInt();
     const char* months[]={"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
@@ -355,8 +345,111 @@ void paintUsageDashboard(bool linked){
     int x=(480-w)/2;gfx->fillCircle(x-16,459,5,linked?GREEN:RED);
     label(x,450,connection,1,linked?GREEN:RED);
 }
+void lucide(int x,int y,const uint8_t* pixels,int size,uint16_t color=WHITE){
+    auto canvas=gfx->getFramebuffer();
+    for(int row=0;row<size;row++)for(int col=0;col<size;col++){
+        int px=x+col,py=y+row;if(px<0 || py<0 || px>=480 || py>=480)continue;
+        unsigned index=row*size+col,byte=pixels[index/2],a=(index&1)?byte&15:byte>>4;
+        if(a)canvas[py*480+px]=blend565(color,canvas[py*480+px],a);
+    }
+}
+void powerIcons(int y){
+    if(bleConnected)lucide(340,y,icon_bluetooth_24,24);
+    if(powerUSB)lucide(310,y,icon_plug_24,24,GREEN);
+    if(powerBattery){
+        label(373,y+3,String(powerPercent)+"%",1);
+        auto icon=powerCharging?icon_battery_charging_24:powerPercent>=95?icon_battery_full_24:powerPercent>=40?icon_battery_medium_24:powerPercent>=10?icon_battery_low_24:icon_battery_24;
+        lucide(431,y,icon,24,powerCharging?GREEN:WHITE);
+    }else{
+        lucide(431,y,powerUSB?icon_plug_24:icon_battery_warning_24,24,MUTED);
+        label(371,y+3,powerUSB?"USB":"--",1,MUTED);
+    }
+}
+void faceFooter(bool linked){
+    gfx->fillCircle(30,447,4,linked?GREEN:RED);
+    label(44,438,linked?(stale?"Connected - stale":"Connected"):"Disconnected",1,linked?GREEN:RED);
+    powerIcons(432);
+}
+void faceBar(int x,int y,int width,float ratio,int height=12){
+    gfx->fillRoundRect(x,y,width,height,height/2,0x2945);
+    int fill=constrain(int(ratio*width),0,width);
+    if(fill)gfx->fillRoundRect(x,y,max(height,fill),height,height/2,PURPLE);
+}
+void faceGauge(float ratio){
+    // Antialiased arc; its center remains black for bounded mascot animation.
+    auto canvas=gfx->getFramebuffer();const float start=0.8f*PI,span=1.4f*PI;
+    for(int y=50;y<375;y++)for(int x=78;x<403;x++){
+        float dx=x-240,dy=y-212,r=sqrtf(dx*dx+dy*dy),edge=7.5f-fabsf(r-154);
+        if(edge<=0)continue;
+        float angle=atan2f(dy,dx);while(angle<start)angle+=2*PI;
+        if(angle>start+span)continue;
+        uint16_t color=angle-start<=span*constrain(ratio,0.0f,1.0f)?PURPLE:0x2945;
+        unsigned alpha=unsigned(min(1.0f,edge)*15);canvas[y*480+x]=blend565(color,canvas[y*480+x],alpha);
+    }
+}
+void compactFaceGhost(){
+    int index=faceIndex(screenLayout.c_str());Rect r=faceRegion(screenLayout.c_str());
+    GhostState state=activity=="Working"?GhostState::Working:activity=="Needs attention"?GhostState::Attention:activity=="Complete"?GhostState::Complete:activity=="Error"?GhostState::Error:activity=="Ready"?GhostState::Ready:GhostState::Unknown;
+    auto pose=ghostPose(state,frameNow-stateSince);
+    const uint16_t* frames[]={GHOST_SOUTH,GHOST_EAST,GHOST_NORTH,GHOST_WEST};
+    const uint16_t* blinks[]={GHOST_SOUTH_BLINK,GHOST_EAST_BLINK,GHOST_NORTH_BLINK,GHOST_WEST_BLINK};
+    int direction=int(pose.facing);if(activity=="Ready" && direction==0){if(index==1)direction=1;if(index==2)direction=3;}
+    const auto* sprite=(pose.blink?blinks:frames)[direction];
+    const int widths[]={94,115,92,70},heights[]={115,140,112,86};int w=widths[index],h=heights[index];
+    int x=r.x+(r.w-w)/2,y=r.y+(r.h-h)/2+lroundf(sinf((frameNow-stateSince)*0.00157f)*3);
+    for(int row=0;row<h;row++)for(int col=0;col<w;col++)gfx->drawPixel(x+col,y+row,sprite[(row*150/h)*123+col*123/w]);
+}
+void paintFace(bool linked){
+    int index=faceIndex(screenLayout.c_str());
+    UsageBars bars=usageBars(available,used,limit,overage);
+    String pct=bars.comparable?String(bars.usedPercent,0)+"%":"--%";
+    String total=available?number(used):"--",allowance=available?number(limit):"--";
+    String count=total+" / "+allowance;
+    String extra=available?number(overage)+" extra credits":"Usage unavailable";
+    if(index==0){
+        centered(24,plan,2,0xC51F);faceGauge(bars.comparable?bars.usedPercent/100:0);
+        centered(222,pct,5);centered(286,"plan used",1,MUTED);
+        int size=textBounds((count+" credits").c_str(),3).w<=420?3:2;
+        centered(330,count+" credits",size);
+        gfx->fillRoundRect(102,374,276,43,21,overage>0?0x3083:0x1082);
+        centered(386,extra,1,overage>0?RED:MUTED);
+    }else if(index==1){
+        fittedLabel(28,27,plan,215,2,0xC51F);
+        fittedLabel(26,95,total,222,6);label(28,173,"of "+allowance+" credits",1,MUTED);
+        fittedLabel(283,65,activity,168,2,0xC51F);gfx->drawFastVLine(260,74,197,0x2945);
+        label(28,290,"PLAN USED",1,MUTED);rightLabel(452,281,pct,3,0xC51F);
+        faceBar(28,328,424,bars.usedPercent/100,16);
+        label(28,370,extra,1,overage>0?RED:MUTED);
+        rightLabel(452,401,resetLabel(),1,MUTED);
+    }else if(index==2){
+        fittedLabel(28,27,plan,380,2,0xC51F);
+        label(28,76,"MONTHLY / CREDITS",1,MUTED);
+        fittedLabel(26,126,total,280,6);label(28,200,"/ "+allowance,3,MUTED);
+        rightLabel(452,214,pct,3,0xC51F);
+        for(int x=26;x<454;x+=13)gfx->drawFastHLine(x,271,5,0x632D);
+        label(28,295,"Included plan",1,MUTED);faceBar(28,333,424,bars.usedPercent/100,10);
+        label(28,370,"Overage",2,MUTED);String credits=available?number(overage)+" credits":"--";
+        int size=textBounds(credits.c_str(),3).w<270?3:2;rightLabel(452,362,credits,size,overage>0?RED:WHITE);
+        label(28,405,resetLabel(),1,MUTED);
+    }else{
+        fittedLabel(28,27,plan,290,2,0xC51F);
+        label(28,109,overage>0?"EXTRA CREDITS":"CREDITS LEFT",1,overage>0?RED:MUTED);
+        fittedLabel(22,171,available?number(overage>0?overage:max(0.0f,limit-used)):"--",424,7,overage>0?RED:WHITE);
+        label(28,286,overage>0?"Plan allowance used":"Ready for your next idea",1,MUTED);
+        fittedLabel(28,324,count+" used",308,3);faceBar(28,374,424,bars.usedPercent/100,8);
+        label(28,398,overage>0?"Overage beyond your plan":resetLabel(),1,overage>0?RED:MUTED);
+    }
+    faceFooter(linked);
+}
+void paintFaceHint(){
+    int index=allFaceIndex(screenLayout.c_str());if(index<0)return;
+    gfx->fillRect(0,428,480,52,BG);centered(430,ALL_FACE_NAMES[index],1,0xC51F);
+    for(int i=0;i<6;i++)gfx->fillCircle(195+i*18,465,i==index?4:3,i==index?PURPLE:0x632D);
+}
+
 void paintStatic(bool linked) {
     gfx->fillScreen(BG);
+    if(!details && faceIndex(screenLayout.c_str())>=0){paintFace(linked);return;}
     paintDeviceIndicators();
     if(!details && screenLayout=="usage"){paintUsageDashboard(linked);return;}
     gfx->fillCircle(24,24,5,linked?GREEN:RED);
@@ -397,7 +490,7 @@ void paintStatic(bool linked) {
         }
         label(18,392,stale?"Usage cache stale":"Usage cache fresh",2,MUTED);
         gfx->drawRoundRect(18,425,444,42,9,PURPLE);
-        centered(436,screenLayout=="usage"?"Back to usage":"Back to ghost",2);
+        centered(436,faceIndex(screenLayout.c_str())>=0?"Back to face":screenLayout=="usage"?"Back to usage":"Back to ghost",2);
     }
 }
 
@@ -412,7 +505,8 @@ void setup(){
     bus->writeC8D8(0x36,0xA0);
     preferences.begin("kirometer",false);
     screenLayout=preferences.getString("screen_layout","ghost");
-    if(screenLayout!="ghost" && screenLayout!="usage")screenLayout="ghost";
+    if(!validLayout(screenLayout.c_str()))screenLayout="ghost";
+    defaultScreenLayout=screenLayout;
     brightness=constrain(preferences.getInt("brightness",180),5,255);
     sleepMode=preferences.getString("sleep_mode","auto");sleepAfter=preferences.getInt("sleep_after",120);
     panel->setBrightness(brightness);
@@ -445,16 +539,25 @@ void loop(){
     serviceReplies();
     Packet packet;if(replies.free()>=4096 && xQueueReceive(blePackets,&packet,0)==pdTRUE){replyBLE=true;handle(packet.bytes);replyBLE=false;}
     static bool touchDown=false;
+    static TouchGesture gesture;
     static unsigned long lastTouchPoll=0;
-    if(touchOK && (touchPending || touchDown) && millis()-lastTouchPoll>=40){
+    if(touchOK && (touchPending || touchDown) && millis()-lastTouchPoll>=20){
         touchPending=false;lastTouchPoll=millis();int16_t tx[5],ty[5];
         bool pressed=touch.getPoint(tx,ty,5)>0;
         if(pressed && !touchDown){
-            touchEvents++;lastInteraction=millis();
-            if(sleeping)wakeDisplay("touch");
-            else if(tx[0]>=18 && tx[0]<=462){
-                if(!details && (screenLayout=="usage"?(ty[0]>=136 && ty[0]<=434):(ty[0]>=354 && ty[0]<=461))){details=true;draw();}
-                else if(details && ty[0]>=425){details=false;draw();}
+            touchEvents++;bool wakeOnly=sleeping;lastInteraction=millis();
+            gesture.begin(tx[0],ty[0],millis(),wakeOnly);
+            if(wakeOnly)wakeDisplay("touch");
+        }else if(pressed){gesture.move(tx[0],ty[0]);lastInteraction=millis();}
+        else if(touchDown){
+            auto action=gesture.end(millis());int x=gesture.x(),y=gesture.y();
+            if(action==Gesture::Next || action==Gesture::Previous){
+                details=false;screenLayout=nextFace(screenLayout.c_str(),action==Gesture::Next?1:-1);swipeEvents++;faceHintUntil=millis()+1300;
+                lastInteraction=millis();draw();
+            }else if(action==Gesture::Tap && x>=18 && x<=462){
+                bool usageTarget=faceIndex(screenLayout.c_str())>=0?(y>=75 && y<=427):screenLayout=="usage"?(y>=136 && y<=434):(y>=354 && y<=461);
+                if(!details && usageTarget){details=true;draw();}
+                else if(details && y>=425){details=false;draw();}
             }
         }
         touchDown=pressed;

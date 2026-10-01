@@ -19,6 +19,7 @@ This is the project standard for firmware, the Kiro Crew app, screen previews, a
 | Firmware battery percentage and secondary metrics | Space Grotesk Regular | 24 px |
 | Firmware plan name, primary metrics, long state labels | Space Grotesk Bold | 36 px |
 | Firmware short state names and detail values | Space Grotesk Bold | 48 px |
+| Firmware face hero metrics | Space Grotesk Bold | 64 / 80 / 120 px |
 | Crew app body and controls | Inherit Crew's active font | 14–16 px; regular body, semibold controls |
 | Crew app page title / section headings | Inherit Crew's active font | 28–32 / 18–20 px |
 | Website-style marketing previews | AWS Diatype; rounded semi-mono headings where available | Use the existing website preview stylesheet |
@@ -64,7 +65,7 @@ RGB565 is a limited palette; the current device values are deliberate approximat
 
 - Main content edge inset: 18–30 px. Card interior inset: 16 px. Use 4 / 8 / 12 / 16 / 20 / 24 px spacing increments where practical.
 - Use rounded rectangular cards and bars. A simulated enclosure is a thick white rounded-square frame with a flat top edge, not a ghost-shaped dome.
-- Keep the battery/USB/charging and Bluetooth indicators in the top-right. Show real reported states; never imply a battery or wireless link exists when it does not.
+- Existing layouts put battery/USB/charging and Bluetooth indicators in the top-right. New concepts may relocate this chrome or remove a fixed top bar to improve their composition (user direction, October 1, 2026). Keep connection and power information discoverable. Show real reported states; never imply a battery or wireless link exists when it does not.
 - Use concise `Connected` / `Disconnected` text with a colored dot. Companion places it top-left; Usage dashboard places it at the bottom.
 - The main page shows the important information. Tapping the usage area opens large-text details; use at least a 42 px-high back target and generous hit areas.
 - No redundant subtitle below the mascot. No decorative timestamps or invented timed quotas.
@@ -77,6 +78,13 @@ RGB565 is a limited palette; the current device values are deliberate approximat
 | `ghost` | Ghost companion | Connection/power → activity → large mascot → compact plan/credit usage |
 | `usage` | Usage dashboard | Small mascot/power → full-width plan banner → included credit usage → red overage card → connection |
 
+| `orbit` | Orbit | Included-credit percentage ring → ghost → used/allowance → red overage |
+| `sidekick` | Sidekick | Large credits used beside mascot → allowance bar → overage/reset |
+| `ticket` | Credit ticket | Plan ticket → large used count → dashed divider → overage/reset |
+| `big_number` | The big number | Large credits remaining or overage → allowance bar → reset/mascot |
+
+All six faces are equal peers. Swipe left or right from any awake face or its detail view to cycle, wrapping at either end. The Crew app sets the startup default and applies it immediately. Manual swipes change only the current face, leaving that default unchanged. The first touch during sleep only wakes the screen. A short face-name and six-dot indicator confirms a switch; do not slide an entire framebuffer.
+
 For Usage dashboard, keep the plan card at `(20, 80, 440, 42)`, credit card at `(20, 136, 440, 152)`, and overage card at `(20, 302, 440, 132)` unless changing the complete layout deliberately. Reset date belongs inside the credit card. Percentage and the used/allowance value must not collide.
 
 ### Crew app
@@ -87,6 +95,7 @@ For Usage dashboard, keep the plan card at `(20, 80, 440, 42)`, credit card at `
 - Keep controls and explanatory text grouped with the setting they affect. Avoid large blank gaps between a heading and its controls.
 - Use a responsive gallery of square device previews, a clear title, a short description, and a native radio choice.
 - Distinguish `Available`, `Selected · save to apply`, and `On your device`. A local selection is not device confirmation.
+- Allow browsing all six faces before connecting a device. Only enable setting a default when the connected firmware supports that face. Keep a bounded firmware-update console/history accessible without a device.
 - Disable unsupported layouts with a firmware-update explanation. Do not list a concept as an available working layout.
 - All choices remain keyboard accessible, have visible focus, and work without interpreting color alone.
 
@@ -114,6 +123,36 @@ Use the actual Kiro mascot assets. Preserve the silhouette and eyes; do not redr
 
 ## Icons and listing artwork
 
+### Interface icons: Lucide by default
+
+Use **Lucide** for all functional interface icons. This matches Kiro Crew's
+[`lucide-react` dependency](https://github.com/kirodotdev/KiroCrew/blob/main/website/package.json)
+and its [sidebar imports](https://github.com/kirodotdev/KiroCrew/blob/main/website/src/pages/ChatSidebar.tsx),
+verified October 1, 2026. Material icons were an example, not a requested second
+library; do not mix icon families by default.
+
+| Meaning | Lucide icon | Sample |
+| --- | --- | --- |
+| Bluetooth connected | `bluetooth` | ![Bluetooth](crew-app/ui/art/icons/lucide-bluetooth.svg) |
+| USB-only power / plugged in | `plug` | ![Plug](crew-app/ui/art/icons/lucide-plug.svg) |
+| USB data connection | `usb` | ![USB](crew-app/ui/art/icons/lucide-usb.svg) |
+| Battery level | `battery`, `battery-low`, `battery-medium`, `battery-full` | ![Battery](crew-app/ui/art/icons/lucide-battery-medium.svg) |
+| Battery charging | `battery-charging` | ![Charging](crew-app/ui/art/icons/lucide-battery-charging.svg) |
+| Battery reading unavailable | `battery-warning` with explicit unknown text | ![Unknown battery](crew-app/ui/art/icons/lucide-battery-warning.svg) |
+| Brightness | `sun` | ![Brightness](crew-app/ui/art/icons/lucide-sun.svg) |
+| Display sleep | `moon` | ![Sleep](crew-app/ui/art/icons/lucide-moon.svg) |
+| Wi-Fi (only if actually supported/connected) | `wifi` | ![Wi-Fi](crew-app/ui/art/icons/lucide-wifi.svg) |
+
+- Preserve the original **24 × 24 viewBox, 2-unit stroke, rounded caps and joins**. Do not sketch approximations or use Unicode/emoji substitutes.
+- Typical app size: 20 px inline, 24 px in controls. Device concept size: 24–32 px. Scale uniformly; never stretch to fit a rectangle.
+- Use `currentColor` in the app so icons follow host light/dark tokens. Use white or muted gray against the device's pure black background. Purple indicates selection; red/green keep their existing meanings.
+- Keep the percentage beside the battery. The fill glyph is approximate: full ≥95%, medium ≥40%, low ≥10%, empty <10%. Charging has its own icon; USB with no battery has a plug. Unknown is never shown as an empty or full battery.
+- Decorative icons beside labels are hidden from assistive technology. An icon-only control must have a meaningful accessible name and a generous hit target.
+- The Kiro mascot and custom duotone Kirometer app logo are brand artwork, not replacements for this functional icon family.
+- Shared assets: `crew-app/ui/art/icons/`; generated module: `crew-app/ui/icons.mjs`; generator: `scripts/build_icons.py`. Retain the included ISC license in packages. Previews and app controls now consume these assets. Firmware 0.6.0 uses these same paths baked at 24/32 px with 4-bit antialiasing. Regenerate with `scripts/build_device_icons.py` (CairoSVG and Pillow).
+
+### Brand artwork
+
 - App icon: front-view ghost enclosure outline with a rounded-square screen cutout. Use a consistent, substantial stroke, rounded joins, neutral gray structure, and purple accents.
 - Duotone means gray plus purple in distinct meaningful parts, like Crew's existing app icons. It does not mean two nearly identical purples or a shaded multicolor illustration.
 - Keep the small sidebar icon legible at native size. Avoid extra detail or hairlines.
@@ -124,8 +163,8 @@ Use the actual Kiro mascot assets. Preserve the silhouette and eyes; do not redr
 
 1. Define a stable ID, primary purpose, hierarchy, and actual supported metrics.
 2. Implement its firmware renderer and bounded animation/touch regions.
-3. Add control validation, device persistence/status reporting, and capability handling.
-4. Add the layout to `scripts/build_layout_previews.py`; regenerate `ui/layouts.mjs` and thumbnails using the shipped font assets.
+3. Add control validation, startup-default persistence, current-face status, swipe-cycle membership, and capability handling.
+4. Render firmware thumbnails with `scripts/render_face_previews.py`, then add the layout to `scripts/build_layout_previews.py`; regenerate `ui/layouts.mjs` and thumbnails using the shipped font assets.
 5. Verify labels at zero, typical, exceeded, stale, unavailable, and large values; check card and indicator collisions.
 6. Test selection, save, device acknowledgement, reconnect, and restart persistence. Check the gallery in light and dark modes.
 7. Build the firmware bundle with notices, update the changelog, and package only supported layouts.

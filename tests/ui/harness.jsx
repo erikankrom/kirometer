@@ -11,10 +11,10 @@ const connected = () => ({
   status: {
     device_id: "test-device",
     device_name: "Alex’s Kirometer",
-    version: "0.5.10",
+    version: "0.6.0",
     controls_supported: true,
-    screen_layouts_supported: true,
-    screen_layout: "ghost",
+    screen_layouts_supported: true, screen_layouts_version: 2,
+    screen_layout: "ghost", default_screen_layout: "ghost",
     bluetooth_supported: true,
     brightness: 180,
     sleep_mode: "auto",
@@ -34,7 +34,7 @@ let info = {
   ports: ["/dev/cu.test-device"],
   bundled_firmware: "/test/firmware.json",
   link: connected(),
-  job: { id: "old-flash", kind: "flash", state: "complete", version: "0.5.10" },
+  job: { id: "old-flash", kind: "flash", state: "complete", version: "0.6.0" },
 };
 const usage = {
   available: true,
@@ -65,6 +65,7 @@ const api = {
       const seq = ++sequence;
       setTimeout(() => {
         Object.assign(info.link.status, body, { control_seq: seq });
+        if (body.screen_layout) info.link.status.default_screen_layout=body.screen_layout;
         info.link.status.sleeping = body.sleep_mode === "sleep";
       }, 600);
       return { queued: true, control_seq: seq };
@@ -90,7 +91,7 @@ const api = {
     }
     if (op === "bundle")
       return {
-        version: "0.5.10",
+        version: "0.6.0",
         board: "waveshare-esp32-s3-touch-amoled-2.16",
         images: [{ offset: 0, size: 1024 }],
       };
@@ -108,7 +109,7 @@ const api = {
       };
       setTimeout(() => {
         info.job.state = "complete";
-        info.job.version = "0.5.10";
+        info.job.version = "0.6.0";
       }, 600);
       return info.job;
     }

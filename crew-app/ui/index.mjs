@@ -1,3 +1,4 @@
+import { icons, batteryIcon } from "./icons.mjs";
 import { screenLayouts } from "./layouts.mjs";
 const { react: React, "@kirocrew/app-sdk": sdk } = window.__kirocrew_modules;
 const { createElement: h, useState, useEffect, useRef } = React;
@@ -5,14 +6,15 @@ const { createElement: h, useState, useEffect, useRef } = React;
 // Inherit Crew's semantic palette so theme changes apply without a reload.
 const styles = `
 .km{--km-purple:#9147ff;--km-tint:color-mix(in srgb,var(--km-purple) 12%,var(--bg-elevated,#fff));color:var(--text,#211d26);font-family:inherit;max-width:1120px;margin:0 auto;padding:32px;line-height:1.5;font-variant-numeric:tabular-nums}
-.km *{box-sizing:border-box}.km h1,.km h2,.km h3,.km p{margin:0}.km h1{font-size:32px;letter-spacing:-1px;font-weight:700}.km h2{font-size:23px;letter-spacing:-.5px}.km h3{font-size:17px}.km p{max-width:65ch}.km .muted{color:var(--muted-strong,var(--muted,#686170))}.km .small{font-size:13px}.km .eyebrow{font-size:12px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--muted,#686170)}
+.km *{box-sizing:border-box}.km .km-icon{display:inline-flex;vertical-align:middle;flex-shrink:0;margin-right:7px}.km .km-icon svg{width:20px;height:20px}.km dd .km-icon{vertical-align:-4px}.km h1,.km h2,.km h3,.km p{margin:0}.km h1{font-size:32px;letter-spacing:-1px;font-weight:700}.km h2{font-size:23px;letter-spacing:-.5px}.km h3{font-size:17px}.km p{max-width:65ch}.km .muted{color:var(--muted-strong,var(--muted,#686170))}.km .small{font-size:13px}.km .eyebrow{font-size:12px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--muted,#686170)}
 .km .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.km .spread{justify-content:space-between}.km .stack{display:grid;gap:16px}.km .gap{margin-top:24px}.km .panel{background:var(--bg-elevated,#fff);border:1px solid var(--border,#ddd8e2);border-radius:16px;padding:24px}.km .subtle{background:var(--bg,#f5f3f8);border-radius:10px;padding:16px}.km .layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:24px;align-items:start}.km .device-head{display:flex;align-items:center;gap:16px}.km .device-title{overflow-wrap:anywhere}.km .device-icon{flex:0 0 64px;width:64px;height:64px;background:var(--km-tint);border-radius:18px;display:grid;place-items:center;color:var(--text,#211d26)}.km .device-icon svg{width:40px;height:40px}
 .km button{appearance:none;font:inherit;font-size:14px;font-weight:600;cursor:pointer;border:1px solid var(--border-strong,var(--border,#d3cbdc));background:var(--bg-elevated,#fff);color:var(--text,#211d26);border-radius:9px;min-height:42px;padding:9px 15px;transition:background .15s,border-color .15s}.km button:hover:not(:disabled){background:var(--bg-hover,#eee8f5)}.km button:active:not(:disabled){transform:translateY(1px)}.km button.primary{background:var(--km-purple);border-color:var(--km-purple);color:white}.km button.primary:hover:not(:disabled){background:#7836dc}.km button.quiet{background:transparent;border-color:transparent}.km button:disabled{opacity:.46;cursor:not-allowed}.km :is(button,input,select,summary):focus-visible{outline:3px solid var(--km-purple);outline-offset:3px}.km button.danger{color:var(--danger,#b4233c)}
 .km .badge{font-size:12px;font-weight:650;border-radius:6px;background:var(--km-tint);padding:4px 9px}.km .status{font-size:13px;display:inline-flex;align-items:center;gap:7px}.km .dot{width:7px;height:7px;border-radius:50%;background:var(--muted,#686170)}.km .online .dot{background:var(--ok,#218445)}.km .notice{padding:12px 15px;background:var(--bg,#f5f3f8);border-left:3px solid var(--km-purple);border-radius:5px;font-size:14px;overflow-wrap:anywhere}.km .notice.error{border-color:var(--danger,#b4233c);color:var(--danger,#b4233c)}.km .notice.success{border-color:var(--ok,#218445)}
 .km .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border,#ddd8e2);margin:24px -24px 20px;padding:0 24px;overflow:auto}.km .tabs button{border:0;border-radius:0;background:transparent;white-space:nowrap;padding:12px 8px;border-bottom:3px solid transparent;min-height:48px}.km .tabs button[aria-selected=true]{border-bottom-color:var(--km-purple);font-weight:750}.km .fields{display:grid;grid-template-columns:1fr 1fr;gap:20px}.km label.field{display:grid;gap:7px;font-size:14px;font-weight:600}.km label.field .hint{font-size:12px;font-weight:400;color:var(--muted-strong,var(--muted,#686170))}.km input:not([type=checkbox]):not([type=radio]):not([type=range]),.km select{font:inherit;font-size:15px;background:var(--bg,#f5f3f8);color:var(--text,#211d26);border:1px solid var(--border-strong,var(--border,#d3cbdc));border-radius:8px;padding:10px 12px;min-height:44px;width:100%}.km input[type=range]{width:100%;accent-color:var(--km-purple);min-height:32px}.km input[type=checkbox],.km input[type=radio]{accent-color:var(--km-purple);width:17px;height:17px;flex-shrink:0}.km fieldset{border:0;margin:0;padding:0;min-width:0}.km .save{border-top:1px solid var(--border,#ddd8e2);padding-top:18px;margin-top:20px}.km .numbers{font-size:32px;letter-spacing:-1px;font-weight:650;line-height:1.25}.km .meter{height:8px;border-radius:8px;background:var(--border,#ddd8e2);overflow:hidden;display:flex}.km .meter .used{background:var(--km-purple)}.km .meter .over{background:var(--danger,#b4233c)}.km dl{margin:0;display:grid;gap:12px}.km dl>div{display:flex;justify-content:space-between;gap:18px;font-size:13px}.km dt{color:var(--muted-strong,var(--muted,#686170))}.km dd{margin:0;text-align:right;overflow-wrap:anywhere}.km .divider{height:1px;background:var(--border,#ddd8e2)}.km .empty{display:grid;justify-items:start;gap:15px}.km .options{display:grid;grid-template-columns:1fr 1fr;gap:14px}.km .choice{text-align:left!important;padding:20px!important;display:grid;gap:6px}.km .choice span{font-weight:400;font-size:13px;color:var(--muted-strong,var(--muted,#686170))}.km .steps{list-style:none;padding:0;margin:20px 0;display:flex;gap:12px;font-size:13px}.km .steps li{flex:1;padding-top:9px;border-top:3px solid var(--border,#ddd8e2);color:var(--muted-strong,var(--muted,#686170))}.km .steps li.current{border-color:var(--km-purple);color:var(--text,#211d26);font-weight:650}.km .device-list{display:grid;gap:8px;padding:0;list-style:none;margin:0}.km .device-list li label{display:flex;gap:12px;align-items:center;padding:14px;border:1px solid var(--border,#ddd8e2);border-radius:9px;cursor:pointer}.km .device-list small{display:block;color:var(--muted-strong,var(--muted,#686170))}.km details summary{font-size:13px;cursor:pointer;color:var(--muted-strong,var(--muted,#686170));padding:8px 0}.km details>div{margin-top:10px}.km .confirm{display:flex;gap:10px;align-items:flex-start;font-size:13px}.km .footer{font-size:12px;color:var(--muted-strong,var(--muted,#686170));margin-top:20px}.km .loading{min-height:170px;display:grid;place-content:center;color:var(--muted,#686170)}
-.km .layout-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-top:12px}.km .screen-card{border:2px solid var(--border,#ddd8e2);border-radius:14px;padding:12px;display:grid;align-content:start;gap:12px;cursor:pointer;transition:border-color .15s,background .15s}.km .screen-card.selected{border-color:var(--km-purple);background:var(--km-tint)}.km .screen-card:has(input:focus-visible){outline:3px solid var(--km-purple);outline-offset:3px}.km .screen-card img{width:100%;height:auto;aspect-ratio:1;display:block;border-radius:9px;background:#000}.km .screen-card .card-title{display:flex;align-items:center;gap:8px;font-size:14px}.km .screen-card .card-title input{margin:0}.km .screen-card p{font-size:12px;color:var(--muted-strong,var(--muted,#686170));line-height:1.5}.km .screen-card .choice-state{font-size:11px;font-weight:600;color:var(--km-purple)}.km fieldset:disabled .screen-card{cursor:default}.km .gallery-legend{font-size:14px;font-weight:650}.km .gallery-note{margin-top:12px;font-size:12px;color:var(--muted-strong,var(--muted,#686170))}
+.km .layout-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-top:12px}.km .screen-card{border:2px solid var(--border,#ddd8e2);border-radius:14px;padding:12px;display:grid;align-content:start;gap:12px;cursor:pointer;transition:border-color .15s,background .15s}.km .screen-card.selected{border-color:var(--km-purple);background:var(--km-tint)}.km .screen-card:has(input:focus-visible){outline:3px solid var(--km-purple);outline-offset:3px}.km .screen-card img{width:100%;height:auto;aspect-ratio:1;display:block;border-radius:9px;background:#000}.km .screen-card .card-title{display:flex;align-items:center;gap:8px;font-size:14px}.km .screen-card .card-title input{margin:0}.km .screen-card p{font-size:12px;color:var(--muted-strong,var(--muted,#686170));line-height:1.5}.km .screen-card .choice-state{font-size:11px;font-weight:600;color:var(--km-purple)}.km fieldset:disabled .screen-card{cursor:default}.km .firmware-console{background:#08080b;color:#e6e1ef;padding:16px;border-radius:10px;max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,monospace}.km summary{cursor:pointer}.km .gallery-legend{font-size:14px;font-weight:650}.km .gallery-note{margin-top:12px;font-size:12px;color:var(--muted-strong,var(--muted,#686170))}
 @media(max-width:950px){.km .layout{grid-template-columns:1fr}.km aside{order:2}.km aside .stack{gap:12px}}@media(max-width:600px){.km{padding:18px}.km .panel{padding:18px}.km .fields,.km .options{grid-template-columns:1fr}.km .tabs{margin-left:-18px;margin-right:-18px;padding:0 18px}.km h1{font-size:28px}.km .device-icon{width:48px;height:48px;flex-basis:48px}.km .steps{gap:8px;font-size:12px}}
 `;
+const uiIcon = name => h("span", {className:"km-icon", "aria-hidden":true, dangerouslySetInnerHTML:{__html:icons[name] || ""}});
 const num = (n) =>
   typeof n === "number"
     ? n.toLocaleString(undefined, { maximumFractionDigits: 2 })
@@ -148,7 +150,7 @@ function UsageSummary({ data, error }) {
         ["Activity", activityNames[data?.activity] || "Unknown"],
         ["Resets", c?.reset_at?.slice(0, 10) || "Unknown"],
       ].map(([k, v]) =>
-        h("div", { key: k }, h("dt", null, k), h("dd", null, v)),
+        h("div", { key: k }, h("dt", null, k), h("dd", null, k === "Connection" && linked ? uiIcon(info?.link.transport === "bluetooth" ? "lucide-bluetooth" : "lucide-usb") : k === "Power" ? uiIcon(d?.battery_percent != null ? batteryIcon(d.battery_percent,d.charging) : d?.power_source === "usb" ? "lucide-plug" : "lucide-battery-warning") : null, v)),
       ),
     ),
     h("div", { className: "divider" }),
@@ -200,6 +202,7 @@ function DeviceManager({ api, usage }) {
   const polled = usePolling(api, "/api/apps/kirometer/devices", 2000);
   const [info, setInfo] = useState(null),
     [view, setView] = useState("manage"),
+    [browseGallery, setBrowseGallery] = useState(false),
     [tab, setTab] = useState("display"),
     [flow, setFlow] = useState(null),
     [step, setStep] = useState(1);
@@ -240,7 +243,7 @@ function DeviceManager({ api, usage }) {
         brightness: d.brightness ?? 180,
         sleep_mode: d.sleep_mode || "auto",
         sleep_after: d.sleep_after ?? 120,
-        screen_layout: d.screen_layout || "ghost",
+        screen_layout: d.default_screen_layout || d.screen_layout || "ghost",
       });
       deviceId.current = d.device_id;
       if (changed) {
@@ -255,6 +258,7 @@ function DeviceManager({ api, usage }) {
     d?.sleep_mode,
     d?.sleep_after,
     d?.screen_layout,
+    d?.default_screen_layout,
     dirty,
     info?.default_name,
   ]);
@@ -262,7 +266,7 @@ function DeviceManager({ api, usage }) {
     if (!pending) return;
     if (d?.control_seq === pending.seq) {
       const matches = Object.entries(pending.values).every(
-        ([k, v]) => d[k] === v,
+        ([k, v]) => (k === "screen_layout" ? d.default_screen_layout || d.screen_layout : d[k]) === v,
       );
       setNotice(
         matches
@@ -609,6 +613,25 @@ function DeviceManager({ api, usage }) {
         (view !== "setup" || info.job.id === flashId) &&
         button("Connect over USB", connectUSB, running || !usbReady),
     );
+  const galleryBrowser = () => h("section", {className:"panel stack", "aria-label":"Screen gallery"},
+    h("div", {className:"row spread"}, h("h2",null,"Screen gallery"), button("Close gallery",()=>setBrowseGallery(false))),
+    h("p", {className:"small muted"},"Explore all six faces. Swipe left or right on your Kirometer to switch between them. Connect a device to choose its startup default."),
+    h("div", {className:"layout-gallery"}, ...screenLayouts.map(layout => h("article",{key:layout.id,className:"screen-card"},
+      h("img",{src:layout.preview,alt:layout.title+" screen preview",width:480,height:480}),
+      h("h3",null,layout.title),h("p",null,layout.description),
+      linked && h("span",{className:"choice-state"}, (d?.screen_layouts_version || 1) < (layout.capabilityVersion || 1) ? "Requires firmware "+layout.minimumFirmware : d?.screen_layout===layout.id ? "Current face" : "Available")))),
+    linked && button("Customize default face",()=>{setBrowseGallery(false);setView("manage");setTab("display");},running),
+    h("p",{className:"gallery-note"},"Previews use sample data. All six faces are included in firmware 0.6.0. Extra-credit meters compare overage with the plan allowance."));
+  const updateLog = () => {
+    const updates = info?.firmware_updates?.length ? info.firmware_updates : info?.job?.kind === "flash" ? [info.job] : [];
+    return h("section",{className:"panel stack","aria-label":"Firmware update history"},
+      h("h3",null,"Firmware updates"),
+      !updates.length ? h("p",{className:"small muted"},"Console output will appear here when you install firmware. The last eight updates are kept on this computer.") :
+      updates.map((job,i)=>h("details",{key:job.id,open:i===0},
+        h("summary",null,"Firmware "+(job.version || "update")+" · "+job.state+(job.started_at ? " · "+new Date(job.started_at*1000).toLocaleString():"")),
+        h("p",{className:"small muted"},job.message),
+        h("pre",{className:"firmware-console",tabIndex:0,"aria-label":"Firmware console output"},job.console || "No console output was recorded for this update."))));
+  };
   const display = () =>
     h(
       "div",
@@ -648,19 +671,19 @@ function DeviceManager({ api, usage }) {
           ),
           h("fieldset", {disabled: !d?.screen_layouts_supported},
             h("legend", {className:"gallery-legend"}, "Screen gallery"),
-            h("p", {className:"small muted"}, "Choose a layout, then save to apply it to your device."),
-            h("div", {className:"layout-gallery"}, ...screenLayouts.map(layout =>
+            h("p", {className:"small muted"}, "Choose your default face. Save applies it now and at startup; swipe on the device to switch faces."),
+            h("div", {className:"layout-gallery"}, ...screenLayouts.filter(layout => (d?.screen_layouts_version || 1)>= (layout.capabilityVersion || 1)).map(layout =>
               h("label", {key:layout.id,className:"screen-card"+(draft.screen_layout===layout.id?" selected":"")},
                 h("img", {src:layout.preview,alt:layout.title+" screen preview",width:480,height:480}),
                 h("div", {className:"card-title"},
                   h("input", {type:"radio",name:"kirometer-screen-layout","aria-label":layout.title,value:layout.id,checked:draft.screen_layout===layout.id,onChange:()=>patch("screen_layout",layout.id)}),
                   h("strong", null,layout.title)),
                 h("p", null,layout.description),
-                h("span", {className:"choice-state"}, d?.screen_layout===layout.id?"On your device":draft.screen_layout===layout.id?"Selected · save to apply":"Available"),
+                h("span", {className:"choice-state"}, draft.screen_layout===layout.id && draft.screen_layout!==(d?.default_screen_layout || d?.screen_layout)?"Selected default · save to apply":d?.screen_layout===layout.id?(d?.default_screen_layout || d?.screen_layout)===layout.id?"Current face · default":"Current face":(d?.default_screen_layout || d?.screen_layout)===layout.id?"Default at startup":"Available"),
               ))),
             h("p", {className:"gallery-note"}, !d?.screen_layouts_supported
               ? "Update to firmware 0.5.9 or later to choose a layout."
-              : "Previews use sample data. The overage meter compares extra credits with the plan allowance; it is not a separate limit."),
+              : "Previews use sample data. Swipe left or right on any device screen to cycle all six faces. Swiping does not change your startup default. Overage meters compare extra credits with the plan allowance."),
           ),
           field(
             "Brightness · " + Math.round((draft.brightness / 255) * 100) + "%",
@@ -770,10 +793,10 @@ function DeviceManager({ api, usage }) {
             "Power",
             d?.battery_percent != null
               ? `${d.battery_percent}% battery${d.charging ? " · charging" : d.power_source === "usb" ? " · plugged in" : ""}`
-              : "USB power",
+              : d?.power_source === "usb" ? "USB power · no battery" : "Power unknown",
           ],
         ].map(([k, v]) =>
-          h("div", { key: k }, h("dt", null, k), h("dd", null, v)),
+          h("div", { key: k }, h("dt", null, k), h("dd", null, k === "Connection" && linked ? uiIcon(info?.link.transport === "bluetooth" ? "lucide-bluetooth" : "lucide-usb") : k === "Power" ? uiIcon(d?.battery_percent != null ? batteryIcon(d.battery_percent,d.charging) : d?.power_source === "usb" ? "lucide-plug" : "lucide-battery-warning") : null, v)),
         ),
       ),
       h(
@@ -1050,7 +1073,7 @@ function DeviceManager({ api, usage }) {
           linked ? "1 connected" : "None connected",
         ),
       ),
-      button(
+      h("div",{className:"row"}, button("Browse screen gallery",()=>setBrowseGallery(v=>!v)), button(
         "Add a device",
         () => {
           setView("setup");
@@ -1060,8 +1083,9 @@ function DeviceManager({ api, usage }) {
         },
         running || view === "setup",
         "primary",
-      ),
+      )),
     ),
+    browseGallery && galleryBrowser(),
     polled.error &&
       h(
         "p",
@@ -1254,5 +1278,6 @@ function DeviceManager({ api, usage }) {
                 ),
       h(UsageSummary, usage),
     ),
+    updateLog(),
   );
 }

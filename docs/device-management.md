@@ -15,7 +15,7 @@ Wireless communication does not use Wi-Fi, HTTP or a corporate LAN. The app mani
 
 ## Display and sleep
 
-The screen uses the selected Ghost first layout: pure black, centered activity and a stationary blinking ghost, a purple plan badge, compact usage bar, remaining credits and red overage. Tap the credit area for large-text details and tap Back to ghost to return. Fonts use FreeSans. Top buttons also toggle usage details.
+The screen uses the selected Ghost first layout: pure black, centered activity and a stationary blinking ghost, a purple plan badge, compact usage bar, remaining credits and red overage. Tap the credit area for large-text details and tap Back to ghost to return. Fonts use embedded Space Grotesk. Top buttons also toggle usage details.
 
 Auto sleep defaults to 120 seconds in Ready, adjustable to 30–3600 seconds. The screensaver keeps BLE and usage sync running while the screen is mostly black. Every 20 seconds the ghost peeks for 5.5 seconds, cycling through left, right, bottom and top. Rotation brings the crown and eyes into view first from every edge. Touching the screen or pressing a top button wakes the display. Waking manual Sleep switches it to Auto and saves that preference; touch resets the idle timeout. The CST9220 remains awake, using reset GPIO40 and interrupt GPIO11 on the shared I2C bus.
 
@@ -104,3 +104,29 @@ Firmware 0.5.10 embeds Kiro Crew's Space Grotesk at 20/24/36/48 px using 4-bit
 coverage, blended into the RGB565 canvas. It does not change animation timing or
 the display driver. Font source and OFL license are included. See DESIGN.md for
 shared standards and scripts/build_fonts.py to regenerate the atlases.
+
+## Six equal faces (app 0.9.0 / firmware 0.6.0)
+
+Ghost companion, Usage dashboard, Orbit, Sidekick, Credit ticket, and The big number
+are all available through one wrapping swipe cycle. Horizontal gestures also work
+from the detail view. A touch while asleep only wakes the display. Swipes require
+64 px horizontal movement, twice the vertical distance, released within 1.5 s;
+taps require at most 18 px travel and 800 ms. These distinguish swipes from detail taps.
+
+Browse screen gallery works before connection. Customize sets a startup default,
+applied immediately and stored in Preferences. Manual swipes change only the
+current face. Status reports `screen_layout`, `default_screen_layout`,
+`screen_layouts_version: 2`, and `swipe_events`. Older firmware retains its two
+supported choices. New face previews are rendered with actual firmware drawing,
+font, and icon code using sample data.
+
+Space Grotesk adds native 64/80/120 px bold metrics. Lucide Bluetooth, battery,
+charging, and plug icons are baked with 4-bit coverage. Animation remains inside
+reserved black regions. The selected face name and six dots briefly appear after
+a swipe; transitions do not animate a full-screen slide.
+
+Firmware updates streams esptool console output during installation, with success,
+failure, and interruption states. The latest eight updates (24,000 characters each)
+are retained locally in `firmware-updates.json` under the app data directory. A
+restart during a running update marks it interrupted. Flash verification and
+confirmed firmware boot remain distinct statuses.

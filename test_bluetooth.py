@@ -13,13 +13,16 @@ b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
 class BluetoothTests(unittest.IsolatedAsyncioTestCase):
     async def test_fragmented_messages_require_matching_ack_and_display(self):
         lines=b.Lines()
-        messages=[{'type':'kirometer.ack','protocol':1,'seq':1,'accepted':True},{'type':'kirometer.status','protocol':1,'displayed_seq':1}, {'type':'kirometer.ack','protocol':1,'seq':2,'accepted':True},{'type':'kirometer.status','protocol':1,'displayed_seq':2,'device_name':'test kirometer','brightness':90,'screen_layout':'usage','screen_layouts_supported':True,'token':'must-not-return'}]
+        messages=[{'type':'kirometer.ack','protocol':1,'seq':1,'accepted':True},{'type':'kirometer.status','protocol':1,'displayed_seq':1}, {'type':'kirometer.ack','protocol':1,'seq':2,'accepted':True},{'type':'kirometer.status','protocol':1,'displayed_seq':2,'device_name':'test kirometer','brightness':90,'screen_layout':'usage','screen_layouts_supported':True,'default_screen_layout':'orbit','screen_layouts_version':2,'swipe_events':3,'token':'must-not-return'}]
         raw=''.join(json.dumps(m)+'\n' for m in messages).encode()
         for i in range(0,len(raw),7):lines.receive(None,raw[i:i+7])
         answer=await lines.response(2,.1)
         self.assertEqual(answer['status']['brightness'],90)
         self.assertEqual(answer['status']['screen_layout'],'usage')
         self.assertTrue(answer['status']['screen_layouts_supported'])
+        self.assertEqual(answer['status']['default_screen_layout'],'orbit')
+        self.assertEqual(answer['status']['screen_layouts_version'],2)
+        self.assertEqual(answer['status']['swipe_events'],3)
         self.assertNotIn('token',answer['status'])
     async def test_overflow_recovers_at_next_line_and_timeout_not_success(self):
         lines=b.Lines();lines.receive(None,b'x'*5000+b'\n')

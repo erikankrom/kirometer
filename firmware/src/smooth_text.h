@@ -3,7 +3,7 @@
 #include <cstring>
 #include "fonts/space_grotesk.h"
 
-inline const SmoothFont& screenFont(int size){return size>=4?space48:size==3?space36:size==1?space20:space24;}
+inline const SmoothFont& screenFont(int size){return size>=7?space120:size==6?space80:size==5?space64:size==4?space48:size==3?space36:size==1?space20:space24;}
 // ASCII UI labels plus an ellipsis; unsupported UTF-8 becomes one '?' per codepoint.
 inline unsigned nextGlyph(const char*& p){
     unsigned char c=*p++;
