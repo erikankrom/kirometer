@@ -1,0 +1,97 @@
+{
+  "name": "kirometer",
+  "version": "0.7.0",
+  "displayName": "Kirometer",
+  "description": "A little companion for your Kiro day. See credit usage and activity on your desk, connect over Bluetooth, and make your Kirometer feel like yours. Includes guided USB firmware setup and device controls for macOS.",
+  "minKiroCrewVersion": "0.7.2",
+  "tags": [
+    "hardware",
+    "usage",
+    "bluetooth",
+    "productivity"
+  ],
+  "ui": {
+    "entry": "index.mjs",
+    "pages": [
+      {
+        "route": "/apps/kirometer",
+        "label": "Kirometer",
+        "icon": "Ghost",
+        "group": "Apps",
+        "iconUrl": "art/icon-crew-light.svg"
+      }
+    ]
+  },
+  "backend": {
+    "hooks": {
+      "routes": "backend.collector:register_routes",
+      "on_startup": "backend.collector:on_startup",
+      "on_shutdown": "backend.collector:on_shutdown"
+    }
+  },
+  "permissions": {
+    "api": [
+      "/api/apps/kirometer/snapshot",
+      "/api/apps/kirometer/health",
+      "/api/apps/kirometer/devices"
+    ],
+    "network": false,
+    "storage": false
+  },
+  "setup": {
+    "configSchema": {
+      "type": "object",
+      "properties": {
+        "db_path": {
+          "type": "string",
+          "title": "Optional Kiro profile database path"
+        },
+        "poll_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 300,
+          "default": 15
+        },
+        "stale_after": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 300
+        }
+      }
+    }
+  },
+  "author": "Erik Ankrom",
+  "icon": "Ghost",
+  "iconPath": "ui/art/icon-crew-light.svg",
+  "heroImage": "ui/art/card-kiro-light.svg",
+  "heroImageDark": "ui/art/card-kiro-dark.svg",
+  "heroImageDetail": "ui/art/banner-kiro-light.svg",
+  "heroImageDetailDark": "ui/art/banner-kiro-dark.svg",
+  "screenshots": [
+    "ui/art/screenshot-device-light.png",
+    "ui/art/screenshot-setup-light.png"
+  ],
+  "screenshotsDark": [
+    "ui/art/screenshot-device-dark.png",
+    "ui/art/screenshot-setup-dark.png"
+  ],
+  "useCases": [
+    "Keep Kiro credits, remaining allowance, overage, and activity visible on a small desk display.",
+    "Set up a new Kirometer or reconnect and customize an existing device from one place."
+  ],
+  "configuration": [
+    "On macOS, connect a Waveshare ESP32-S3-Touch-AMOLED-2.16 by USB-C for the first firmware install and Bluetooth provisioning.",
+    "Allow Kiro Crew to use Bluetooth, then connect wirelessly. Choose a device name, brightness, and automatic display sleep.",
+    "Reads local Crew billing data with an IDE cache fallback. Screenshot values are illustrative sample data."
+  ],
+  "highlights": [
+    "Credit usage, remaining allowance, and red overage tracking at a glance.",
+    "Bluetooth usage sync and controls without joining corporate Wi-Fi.",
+    "Guided firmware setup over USB-C, with device confirmation after flashing.",
+    "Personalize the name, brightness, and display sleep settings.",
+    "Directional ghost animations for each activity state, with blinking and a black touch-wake screensaver.",
+    "Device-management page designed for both light and dark mode.",
+    "Automatic Bluetooth reconnection after temporary interruptions."
+  ],
+  "iconPathDark": "ui/art/icon-crew-dark.svg"
+}

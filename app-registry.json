@@ -1,0 +1,8 @@
+[
+  {
+    "name": "kirometer",
+    "gitUrl": "https://github.com/erikankrom/kirometer",
+    "branch": "crew-release",
+    "subdirectory": "apps/kirometer"
+  }
+]

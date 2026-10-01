@@ -1,0 +1,7 @@
+# Kirometer listing artwork
+
+The banner and card mascot uses the original ghost paths and mask from https://kiro.dev/icon.svg, retrieved October 1, 2026. Shape and eyes are unchanged; the purple app-tile background is omitted when placing the ghost on the illustrated screen. The source SVG is included as kiro-official.svg. Kiro artwork belongs to its respective owner; Kirometer is a companion project.
+
+The duotone app icon uses the curve_outline control points from cad/build_enclosure.py and the 44.4 mm rounded screen opening. The final light/dark variants follow Crew’s icon treatment: neutral gray outline and translucent body fill, with a purple screen tint and usage accent. Outer strokes are 6.8 units on a 96-unit canvas. The SVG files are editable source artwork.
+
+Screenshots show the shipped crew-app/ui/index.mjs rendered by tests/ui/harness.jsx with illustrative sample data, in both light and dark mode.
