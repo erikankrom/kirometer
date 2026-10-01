@@ -12,6 +12,40 @@ import test_crew_app
 devices = importlib.import_module('kirometer_test_backend.devices')
 
 class DeviceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_flash_identity_comes_from_target_usb_not_another_bluetooth_device(self):
+        with tempfile.TemporaryDirectory() as root:
+            ctx = types.SimpleNamespace(data_dir=root)
+            inventory = [{'device':'/dev/cu.shared','vid':0x303A,'pid':0x1001,'serial_number':'44:BD:8D:60:DA:5C'}]
+            with patch.object(devices, '_history_path', None), patch.object(devices, '_history', []), patch.object(devices, '_job', None), patch.object(devices, '_task', None), patch.object(devices, '_link', {'connected':True,'transport':'bluetooth','status':{'device_id':'10da608dbd44','device_name':'Other device'}}), patch.object(devices.sys, 'platform', 'darwin'), patch.object(devices, 'tools_ready', return_value=True), patch.object(devices, 'check_port'), patch.object(devices, 'port_inventory', new_callable=AsyncMock, return_value=inventory), patch.object(devices, 'disconnect', new_callable=AsyncMock), patch.object(devices, 'worker', new_callable=AsyncMock):
+                job = await devices.start('flash', ctx, '/dev/cu.shared', {'version':'test'})
+                await devices._task
+                self.assertEqual(job['device']['device_id'], '5cda608dbd44')
+                self.assertEqual(job['device']['usb_serial'], '44:BD:8D:60:DA:5C')
+                self.assertNotIn('name', job['device'])
+
+    def test_old_logs_are_migrated_by_mac_never_by_reused_port(self):
+        with tempfile.TemporaryDirectory() as root:
+            stored = [{'id':'a','port':'/dev/cu.shared','console':'MAC:                44:bd:8d:60:da:10\n','state':'complete'},
+                      {'id':'b','port':'/dev/cu.shared','console':'No serial data received.','state':'failed'}]
+            path = Path(root)/'firmware-updates.json'
+            path.write_text(json.dumps(stored))
+            with patch.object(devices, '_history_path', None), patch.object(devices, '_history', []), patch.object(devices, '_job', None):
+                devices.load_history(types.SimpleNamespace(data_dir=root))
+                self.assertEqual(devices._history[0]['device']['device_id'], '10da608dbd44')
+                self.assertNotIn('device', devices._history[1])
+                self.assertEqual(json.loads(path.read_text())[0]['device']['source'], 'bootloader')
+
+    def test_history_keeps_eight_updates_per_device_and_bootloader_corrects_identity(self):
+        jobs = [{'device':{'device_id':'a'},'id':str(i)} for i in range(10)] + [{'device':{'device_id':'b'},'id':'b'}]
+        with patch.object(devices, '_history', jobs):
+            devices.trim_history()
+            self.assertEqual(len(devices._history), 9)
+            self.assertEqual(devices._history[-1]['id'], 'b')
+        job = {'device':{'device_id':'wrong','name':'Wrong device'}, 'console':'MAC: 44:bd:8d:60:da:5c\n'}
+        devices.identity_from_console(job)
+        self.assertEqual(job['device'], {'device_id':'5cda608dbd44','source':'bootloader'})
+        self.assertEqual(devices.usb_identity({'vid':0x10C4,'serial_number':'44:bd:8d:60:da:10'}), {'usb_serial':'44:bd:8d:60:da:10'})
+
     async def test_usb_inventory_filters_metadata_and_caches_without_opening_ports(self):
         ctx = types.SimpleNamespace(data_dir='/tmp/inventory-test')
         data = [{'device':'/dev/cu.usbmodem1','serial_number':'SERIAL-1','vid':123,'token':'private'},

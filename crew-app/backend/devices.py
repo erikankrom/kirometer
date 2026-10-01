@@ -89,14 +89,14 @@ def check_port(port):
     return port
 
 
-async def port_inventory(ctx, current_ports):
+async def port_inventory(ctx, current_ports, force=False):
     """Cache host metadata; enumeration never opens a serial connection."""
     global _inventory_cache
     if not current_ports or not tools_ready(ctx):
         return []
     key = (str(ctx.data_dir), tuple(current_ports))
     async with _inventory_lock:
-        if _inventory_cache and _inventory_cache[0] == key and time.monotonic() < _inventory_cache[1]:
+        if not force and _inventory_cache and _inventory_cache[0] == key and time.monotonic() < _inventory_cache[1]:
             return _inventory_cache[2]
         try:
             raw = json.loads(await command([python(ctx), Path(__file__).with_name('port_inventory.py')], timeout=5))
@@ -107,10 +107,50 @@ async def port_inventory(ctx, current_ports):
                 result.append({k: v for k, v in item.items()
                                if k in ('device', 'description', 'serial_number', 'manufacturer', 'vid', 'pid')
                                and (v is None or isinstance(v, (str, int))) and len(str(v)) <= 200})
+                identifier = usb_identity(result[-1]).get('device_id')
+                if identifier:
+                    result[-1]['device_id'] = identifier
         except (ValueError, TypeError, OSError, TimeoutError):
             result = []
         _inventory_cache = (key, time.monotonic() + 15, result)
         return result
+
+
+def chip_id(mac):
+    # ESP.getEfuseMac() formats the six MAC bytes as a little-endian integer.
+    if not isinstance(mac, str) or not re.fullmatch(r'(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}', mac):
+        return None
+    return ''.join(reversed(mac.lower().split(':')))
+
+
+def usb_identity(item):
+    serial = item.get('serial_number')
+    result = {'usb_serial': serial} if serial else {}
+    # Only the ESP native USB serial number is its chip MAC, not USB-UART serials.
+    if item.get('vid') == 0x303A and item.get('pid') == 0x1001 and chip_id(serial):
+        result.update(device_id=chip_id(serial), source='usb_serial')
+    return result
+
+
+def identity_from_console(job):
+    match = re.search(r'^MAC:\s*((?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})\s*$', job.get('console', ''), re.MULTILINE)
+    if match:
+        verified = chip_id(match.group(1))
+        previous = job.get('device') or {}
+        job['device'] = {**(previous if previous.get('device_id') == verified else {}),
+                         'device_id': verified, 'source': 'bootloader'}
+
+
+def trim_history():
+    counts = {}
+    kept = []
+    for job in _history:
+        device = job.get('device') or {}
+        key = device.get('device_id') or device.get('usb_serial') or 'unidentified'
+        counts[key] = counts.get(key, 0) + 1
+        if counts[key] <= 8:
+            kept.append(job)
+    _history[:] = kept[:256]
 
 
 def validate_bundle(path):
@@ -155,14 +195,17 @@ def load_history(ctx):
     _history_path = path
     try:
         stored = json.loads(path.read_text())
-        _history = stored[:8] if isinstance(stored, list) else []
+        _history = [job for job in stored[:256] if isinstance(job, dict)] if isinstance(stored, list) else []
     except (OSError, ValueError):
         _history = []
     for job in _history:
+        identity_from_console(job)
         if job.get('state') == 'running':
             job.update(state='interrupted', message='App restarted during update. Check device status before retrying.')
     if _history:
         _job = _history[0]
+    trim_history()
+    persist_history()
 
 
 def persist_history():
@@ -181,6 +224,7 @@ def append_console(text):
     text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text).replace('\r', '\n')
     text = ''.join(c for c in text if c in '\n\t' or ord(c) >= 32)
     _job['console'] = (_job.get('console', '') + text)[-24000:]
+    identity_from_console(_job)
     persist_history()
 
 
@@ -265,16 +309,27 @@ async def start(kind,ctx,port=None,bundle=None):
         raise ValueError('Device operations currently support macOS only.')
     async with _lock:
         load_history(ctx)
-        await disconnect()
         if _task and not _task.done():
             raise ValueError('Another device operation is already running.')
         if kind == 'flash' and not tools_ready(ctx):
             raise ValueError('Set up device tools first.')
+        identity = {}
+        if kind == 'flash':
+            check_port(port)
+            inventory = await port_inventory(ctx, [port], force=True)
+            target = next((item for item in inventory if item['device'] == port), {})
+            identity = usb_identity(target)
+            status = _link.get('status') or {}
+            if identity.get('device_id') and identity['device_id'] == status.get('device_id'):
+                identity['name'] = status.get('device_name')
+            elif _link.get('connected') and _link.get('transport') == 'usb' and _link.get('port') == port and not identity.get('device_id'):
+                identity.update(device_id=status.get('device_id'), name=status.get('device_name'), source='usb_status')
+        await disconnect()
         _job = {'id':uuid.uuid4().hex,'kind':kind,'state':'running','port':port,'started_at':time.time(),'message':'Setting up tools…' if kind in ('setup','setup_bluetooth') else 'Flashing firmware…'}
         if kind == 'flash':
-            _job.update(version=bundle['version'], console='Preparing firmware update…\n')
+            _job.update(version=bundle['version'], device=identity, console='Preparing firmware update…\n')
             _history.insert(0, _job)
-            del _history[8:]
+            trim_history()
             persist_history()
         _task = asyncio.create_task(worker(kind,ctx,port,bundle))
         return dict(_job)

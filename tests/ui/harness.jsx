@@ -36,7 +36,8 @@ let info = {
   port_details: [{device:"/dev/cu.test-device",serial_number:"SAMPLE-USB-SERIAL",description:"USB JTAG/serial debug unit",vid:12346,pid:4097}],
   bundled_firmware: "/test/firmware.json",
   link: connected(),
-  job: { id: "old-flash", kind: "flash", state: "complete", version: "0.6.0" },
+  job: { id: "old-flash", kind: "flash", state: "complete", version: "0.6.0", device:{device_id:"test-device"} },
+  firmware_updates: [{id:"mine",kind:"flash",state:"complete",version:"0.6.0",device:{device_id:"test-device",usb_serial:"SAMPLE-USB-SERIAL"},port:"/dev/cu.test-device",console:"Hash of data verified."},{id:"other",kind:"flash",state:"failed",version:"0.7.1",device:{device_id:"other-device"},port:"/dev/cu.test-device",console:"OTHER DEVICE LOG MUST NOT APPEAR"}],
 };
 const usage = {
   available: true,

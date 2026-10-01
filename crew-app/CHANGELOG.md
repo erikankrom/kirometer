@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.4
+
+- Associate firmware updates with the target device identity, preserving USB serial and port context.
+- Show device-specific history inside Firmware, with logs collapsed by default.
+- Recover older device associations from recorded bootloader MAC addresses; do not infer ownership from reused USB ports.
+
 ## 0.11.3
 
 - Add Device info as the first tab, with device identity, firmware, connection, power, display status, and reported capabilities.

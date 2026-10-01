@@ -1,4 +1,5 @@
 import { icons, batteryIcon } from "./icons.mjs";
+import { updatesForDevice } from "./firmware-history.mjs";
 import { screenLayouts } from "./layouts.mjs";
 const { react: React, "@kirocrew/app-sdk": sdk } = window.__kirocrew_modules;
 const { createElement: h, useState, useEffect, useRef } = React;
@@ -480,6 +481,17 @@ function DeviceManager({ api, usage }) {
         "One Kirometer can sync at a time. Connecting another device replaces the current connection.",
       ),
     );
+  const historyTarget = () => {
+    if (view !== "setup" && d?.device_id) return {device_id:d.device_id, name:d.device_name};
+    const selected = info?.port_details?.find(item => item.device === port);
+    return {device_id:selected?.device_id, usb_serial:selected?.serial_number};
+  };
+  const targetUpdates = () => {
+    const updates = info?.firmware_updates?.length ? info.firmware_updates : info?.job?.kind === "flash" ? [info.job] : [];
+    const activeJobId = view === "setup" && info?.job?.port === port ? flashId : null;
+    return updatesForDevice(updates, historyTarget(), activeJobId);
+  };
+  const jobBelongsToTarget = () => targetUpdates().some(job => job.id === info?.job?.id);
   const firmware = () =>
     h(
       "div",
@@ -596,6 +608,7 @@ function DeviceManager({ api, usage }) {
               action("flash", { path, port, confirm: true }, (r) => {
                 setConfirmed(false);
                 setFlashId(r.id);
+                setView("setup"); setFlow("new"); setStep(2);
               }),
             running || !confirmed || !usbReady,
             "primary",
@@ -603,7 +616,7 @@ function DeviceManager({ api, usage }) {
         ),
       info.job?.kind === "flash" &&
         info.job.state === "complete" &&
-        (view !== "setup" || info.job.id === flashId) &&
+        jobBelongsToTarget() &&
         h(
           "div",
           { className: "notice success" },
@@ -616,8 +629,9 @@ function DeviceManager({ api, usage }) {
       info.job?.kind === "flash" &&
         info.job.state === "complete" &&
         !linked &&
-        (view !== "setup" || info.job.id === flashId) &&
+        jobBelongsToTarget() &&
         button("Connect over USB", connectUSB, running || !usbReady),
+      updateLog(),
     );
   const galleryBrowser = () => h("section", {className:"panel stack", "aria-label":"Screen gallery"},
     h("div", {className:"row spread"}, h("h2",null,"Screen gallery"), button("Close gallery",()=>setBrowseGallery(false))),
@@ -629,14 +643,19 @@ function DeviceManager({ api, usage }) {
     linked && button("Customize default face",()=>{setBrowseGallery(false);setView("manage");setTab("screen");},running),
     h("p",{className:"gallery-note"},"Previews use sample data. All six faces are included in firmware 0.6.0. Extra-credit meters compare overage with the plan allowance."));
   const updateLog = () => {
-    const updates = info?.firmware_updates?.length ? info.firmware_updates : info?.job?.kind === "flash" ? [info.job] : [];
-    return h("section",{className:"panel stack","aria-label":"Firmware update history"},
-      h("h3",null,"Firmware updates"),
-      !updates.length ? h("p",{className:"small muted"},"Console output will appear here when you install firmware. The last eight updates are kept on this computer.") :
-      updates.map((job,i)=>h("details",{key:job.id,open:i===0},
+    const updates = targetUpdates();
+    const target = historyTarget();
+    return h("section",{className:"stack","aria-label":"Firmware update history"},
+      h("div", {className:"divider"}),
+      h("h3",null,"Firmware update history"),
+      h("p",{className:"small muted"}, target.name ? "Updates for "+target.name+" · "+target.device_id : target.device_id ? "Updates for device "+target.device_id : target.usb_serial ? "Updates for USB serial "+target.usb_serial : "Select an identifiable USB device to see its update history."),
+      !updates.length ? h("p",{className:"small muted"},"No recorded firmware updates for this device.") :
+      updates.map(job=>h("details",{key:job.id},
         h("summary",null,"Firmware "+(job.version || "update")+" · "+job.state+(job.started_at ? " · "+new Date(job.started_at*1000).toLocaleString():"")),
         h("p",{className:"small muted"},job.message),
-        h("pre",{className:"firmware-console",tabIndex:0,"aria-label":"Firmware console output"},job.console || "No console output was recorded for this update."))));
+        h("p",{className:"small muted"},"Device ID: "+(job.device?.device_id || "Not recorded")+" · USB serial: "+(job.device?.usb_serial || "Not recorded")+" · Port at update: "+(job.port || "Not recorded")),
+        h("pre",{className:"firmware-console",tabIndex:0,"aria-label":"Firmware console output"},job.console || "No console output was recorded for this update."))),
+      h("p",{className:"small muted"},"Up to eight updates per device are kept on this computer. Older logs without a verified device identity are not assigned to this device."));
   };
   const saveBar = () =>
       h(
@@ -1172,6 +1191,7 @@ function DeviceManager({ api, usage }) {
         info.job.message || "Working…",
       ),
     info?.job &&
+      (info.job.kind !== "flash" || jobBelongsToTarget()) &&
       ["failed", "interrupted"].includes(info.job.state) &&
       h(
         "p",
@@ -1355,6 +1375,5 @@ function DeviceManager({ api, usage }) {
                 ),
       h(UsageSummary, usage),
     ),
-    updateLog(),
   );
 }
