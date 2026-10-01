@@ -37,8 +37,6 @@ jobs:
           /tmp/font-test
           g++ -std=c++17 tests/face_navigation_test.cpp -o /tmp/face-test
           /tmp/face-test
-          g++ -std=c++17 tests/notification_sound_test.cpp -o /tmp/sound-test
-          /tmp/sound-test
       - name: Build runtime package and registry
         env:
           REPOSITORY: ${{ github.repository }}

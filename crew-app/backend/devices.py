@@ -27,16 +27,6 @@ _link = {"connected": False, "port": None, "status": None, "message": "No device
 
 def validate_controls(payload):
     out={}
-    if 'test_sound' in payload:
-        if payload['test_sound'] not in ('chime','ding','blip','pop','pulse'):raise ValueError('Choose a supported test sound.')
-        if len(payload)!=1:raise ValueError('Test a sound separately from saving settings.')
-        out['test_sound']=payload['test_sound']
-    if 'sound_enabled' in payload:
-        if not isinstance(payload['sound_enabled'],bool):raise ValueError('Sound enabled must be true or false.')
-        out['sound_enabled']=payload['sound_enabled']
-    if 'sound_preset' in payload:
-        if payload['sound_preset'] not in ('chime','ding','blip','pop','pulse'):raise ValueError('Choose a supported notification sound.')
-        out['sound_preset']=payload['sound_preset']
     if 'screen_layout' in payload:
         if payload['screen_layout'] not in ('ghost','usage','orbit','sidekick','ticket','big_number'):raise ValueError('Choose an available screen layout.')
         out['screen_layout']=payload['screen_layout']
@@ -298,13 +288,6 @@ async def route(request,ctx):
             if not _link.get('connected'):raise ValueError('Connect a device before changing settings.')
             if not (_link.get('status') or {}).get('controls_supported'):raise ValueError('Flash Kirometer 0.5.3 to enable device controls.')
             controls=validate_controls(payload)
-            if any(k in controls for k in ('sound_enabled','sound_preset')) and not (_link.get('status') or {}).get('sounds_supported'):
-                raise ValueError('Update to firmware 0.7.0 or later for notification sounds.')
-            if 'test_sound' in controls:
-                status=_link.get('status') or {}
-                if not status.get('test_sound_supported'):raise ValueError('Update to firmware 0.7.1 or later to test sounds.')
-                if not status.get('audio_ready'):raise ValueError('Device audio is unavailable. Restart your Kirometer and try again.')
-                if _pending_controls:raise ValueError('Wait for the current device command to finish.')
             _control_seq+=1;controls['seq']=_control_seq;_pending_controls=controls
             from .runtime import notify_update
             notify_update()
@@ -407,8 +390,8 @@ async def bridge_once(ctx,port,transport='usb'):
             seq+=1
             snapshot=runtime.current_snapshot()
             # Project only the usage contract; exclude cache paths and unrelated content.
-            payload={k:snapshot.get(k) for k in ('available','stale','credits','activity','plan','needs_response','response_event')}
-            payload.update(type='kirometer.usage',protocol=1,seq=seq,notification_baseline=seq==1)
+            payload={k:snapshot.get(k) for k in ('available','stale','credits','activity','plan')}
+            payload.update(type='kirometer.usage',protocol=1,seq=seq)
             controls=_pending_controls
             if transport=='usb' and not provisioned and (_link.get('status') or {}).get('bluetooth_supported'):
                 _control_seq_local=secrets.randbits(31) or 1

@@ -1,17 +1,10 @@
-# Release notes
+# Changelog
 
-## 0.11.1
+## 0.11.2
 
-- Preview any selected tone using Play test sound in Customize, including when notification sounds are off.
-- Firmware 0.7.1 supports one-shot test commands without changing saved sound preferences.
-- Confirm the device accepted the test and preserve unsaved form edits.
-
-## 0.11.0
-
-- Opt-in device notification sounds: Chime, Ding, Blip, Pop and Pulse from Kiro Crew.
-- Firmware 0.7.0 plays once when a Crew session begins waiting for a response. Approvals, completion, repeated syncs and reconnects stay silent.
-- Save sound enablement and selection on the device from Customize; laptop sound settings remain unchanged.
-- Audio runs on a separate task to keep touch, display animation and Bluetooth responsive.
+- Withdraw notification sounds and test-sound controls while hardware stability is investigated.
+- Restore the pre-sound firmware bundle, version 0.6.0. Existing devices are not automatically reflashed.
+- Preserve six swipeable faces, the screen gallery, and responsive activity delivery with cached billing reads.
 
 ## 0.10.0
 

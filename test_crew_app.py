@@ -143,38 +143,3 @@ class IndependentCadenceTests(unittest.IsolatedAsyncioTestCase):
                     request.json=AsyncMock(return_value={'poll_seconds':invalid})
                     self.assertEqual((await collector.settings(request,ctx)).status,400)
                 self.assertEqual(collector._settings['poll_seconds'],600)
-
-class ResponseSoundTests(unittest.TestCase):
-    def test_new_response_only_and_no_replay_on_initial_discovery(self):
-        from kirometer_test_backend.activity import ActivityTracker
-        tracker=ActivityTracker()
-        self.assertEqual(tracker.responses(['a'])['response_event'],'')
-        tracker.responses([])
-        first=tracker.responses(['a'])['response_event']
-        self.assertTrue(first)
-        self.assertEqual(tracker.responses(['a'])['response_event'],first)
-        second=tracker.responses(['a','b'])['response_event']
-        self.assertNotEqual(second,first)
-        self.assertEqual(tracker.responses(['b'])['response_event'],second)
-        self.assertFalse(tracker.responses([])['needs_response'])
-        tracker.response_slots=None
-        self.assertEqual(tracker.responses(['old'])['response_event'],second)
-
-    def test_only_waiting_input_creates_response_event(self):
-        from unittest.mock import patch
-        from kirometer_test_backend.activity import ActivityTracker
-        module=types.ModuleType('kiro_crew.dashboard.session_health')
-        module.snapshot_state=lambda state:types.SimpleNamespace(slots=[types.SimpleNamespace(key='a')],mono_now=0,subagents_running=0)
-        health=types.SimpleNamespace(classification='running')
-        module.SessionHealthMonitor=lambda **kwargs:types.SimpleNamespace(classify_slot=lambda *a,**kw:health)
-        tracker=ActivityTracker()
-        with patch.dict(sys.modules,{'kiro_crew.dashboard.session_health':module}):
-            state=types.SimpleNamespace(_slots={})
-            tracker.read(state)
-            health.classification='waiting_permission'
-            self.assertFalse(tracker.read(state)['needs_response'])
-            health.classification='waiting_input'
-            data=tracker.read(state)
-            self.assertTrue(data['needs_response'])
-            self.assertTrue(data['response_event'])
-            self.assertEqual(tracker.read(state)['response_event'],data['response_event'])

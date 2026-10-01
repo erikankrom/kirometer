@@ -40,8 +40,6 @@ def package_files():
     result[Path('firmware/ICON-LICENSE.txt')]=(ROOT/'crew-app/ui/art/icons/LUCIDE-LICENSE').read_bytes()
     for name in ('GHOST-LICENSE','GHOST-SOURCE.md'):
         result[Path('firmware')/name]=(ROOT/'firmware'/name).read_bytes()
-    result[Path('firmware/AUDIO-LICENSE.txt')]=(ROOT/'firmware/lib/es8311/LICENSE').read_bytes()
-    result[Path('firmware/AUDIO-SOURCE.md')]=(ROOT/'docs/notification-sounds.md').read_bytes()
     return app,manifest,result
 
 def build(output,registry=None,repo=None):

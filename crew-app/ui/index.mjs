@@ -226,8 +226,6 @@ function DeviceManager({ api, usage }) {
   const [draft, setDraft] = useState({
       device_name: "",
       brightness: 180,
-      sound_enabled: false,
-      sound_preset: "chime",
       sleep_mode: "auto",
       sleep_after: 120,
       screen_layout: "ghost",
@@ -248,8 +246,6 @@ function DeviceManager({ api, usage }) {
       setDraft({
         device_name: d.device_name || info.default_name || "",
         brightness: d.brightness ?? 180,
-        sound_enabled: d.sound_enabled ?? false,
-        sound_preset: d.sound_preset || "chime",
         sleep_mode: d.sleep_mode || "auto",
         sleep_after: d.sleep_after ?? 120,
         screen_layout: d.default_screen_layout || d.screen_layout || "ghost",
@@ -264,8 +260,6 @@ function DeviceManager({ api, usage }) {
     d?.device_id,
     d?.device_name,
     d?.brightness,
-    d?.sound_enabled,
-    d?.sound_preset,
     d?.sleep_mode,
     d?.sleep_after,
     d?.screen_layout,
@@ -276,11 +270,6 @@ function DeviceManager({ api, usage }) {
   useEffect(() => {
     if (!pending) return;
     if (d?.control_seq === pending.seq) {
-      if (pending.test) {
-        setNotice(d.last_sound_test_seq === pending.seq ? "Kirometer accepted the test sound. Your saved settings are unchanged." : "The device could not play the test sound. Check its audio status.");
-        setPending(null);
-        return;
-      }
       const matches = Object.entries(pending.values).every(
         ([k, v]) => (k === "screen_layout" ? d.default_screen_layout || d.screen_layout : d[k]) === v,
       );
@@ -350,16 +339,9 @@ function DeviceManager({ api, usage }) {
   const save = () => {
     const values = { ...draft, device_name: draft.device_name.trim() };
     if (!d?.screen_layouts_supported) delete values.screen_layout;
-    if (!d?.sounds_supported) {delete values.sound_enabled; delete values.sound_preset;}
     action("controls", values, (r) => {
       setPending({ seq: r.control_seq, values });
       setNotice("Sent to device. Waiting for confirmation…");
-    });
-  };
-  const testSound = () => {
-    action("controls", {test_sound:draft.sound_preset}, (r) => {
-      setPending({seq:r.control_seq,test:true});
-      setNotice("Sending test sound to Kirometer…");
     });
   };
   const quickSleep = () => {
@@ -684,7 +666,7 @@ function DeviceManager({ api, usage }) {
               "quiet",
             ),
           button(
-            pending ? (pending.test ? "Testing…" : "Saving…") : "Save changes",
+            pending ? "Saving…" : "Save changes",
             save,
             running || !controllable || !dirty || !valid || !!pending,
             "primary",
@@ -797,17 +779,6 @@ function DeviceManager({ api, usage }) {
         { className: "small muted" },
         "The black screensaver lets your ghost peek in occasionally. Touch the screen or press a top button to wake it.",
       ),
-      h("fieldset",{disabled:running || !controllable || !!pending || !d?.sounds_supported || d?.audio_ready===false,className:"stack"},
-        h("h3",null,"Notification sounds"),
-        h("label",{className:"confirm"},h("input",{type:"checkbox",checked:draft.sound_enabled,onChange:e=>patch("sound_enabled",e.target.checked)}),"Enable sounds on Kirometer"),
-        field("Needs Response sound",h("select",{value:draft.sound_preset,"aria-describedby":"km-sound-help",onChange:e=>patch("sound_preset",e.target.value)},
-          ...["chime","ding","blip","pop","pulse"].map(t=>h("option",{key:t,value:t},t[0].toUpperCase()+t.slice(1))))),
-        h("div",{className:"row"},button(pending?.test ? "Sending test…" : "Play test sound",testSound,!d?.test_sound_supported || !!pending || running)),
-        h("p",{className:"small muted"},d?.test_sound_supported ? "Preview the selected sound on your device, even when alerts are off. Testing does not save changes." : "Update to firmware 0.7.1 or later to test sounds on the device."),
-        h("p",{id:"km-sound-help",className:"small muted"},"Needs Response is the only supported alert so far. Your Kirometer plays the selected Kiro Crew sound once when a chat starts waiting for your reply. Repeated syncs and normal completion stay silent. Sounds are off by default; these settings do not change sounds on your computer."),
-      ),
-      !d?.sounds_supported && h("p",{className:"small muted"},"Update to firmware 0.7.0 or later to enable notification sounds."),
-      d?.sounds_supported && d?.audio_ready===false && h("p",{className:"notice"},"Device audio could not initialize. Reconnect or restart your Kirometer before enabling sounds."),
       saveBar(),
     );
   const connection = () =>
