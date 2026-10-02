@@ -37,3 +37,17 @@ Crew checks repository metadata and applies updates using its Sync/update action
 ## Artwork
 
 Kiro artwork is from Amazon's [Spirit of Kiro](https://github.com/kirodotdev/spirit-of-kiro). See `ui/art/SOURCES.md` and `firmware/GHOST-LICENSE`. West is a mirrored East pose. Screenshots use illustrative data. This is a community hardware project.
+
+### Multiple Kirometers and reconnects
+
+Each configured meter has a saved card, independent connection worker, and device-specific controls. Unavailable meters stay visible with their last known name/firmware, Retry now, and an automatic retry countdown. Pause retries stops only that meter. Saved devices and reconnect preferences survive Crew restarts. USB and Bluetooth connections are deduplicated using the firmware chip ID, not their names.
+
+Bluetooth retries back off after failures: 5, 10, 20, 40, 80, 160, then 300 seconds (capped). A connection that successfully delivers for at least 30 seconds resets the sequence; brief flaps do not. Retry now cancels the scheduled worker and starts one fresh attempt. Pairing changes require user intervention. USB reconnect remains explicit. Billing and activity collection cadence is unchanged.
+
+### Session Activity details (firmware 0.8.0)
+
+Tap a face's usage area to open Session Activity. Today’s session count is followed by messages and tool calls, then this week/month’s session counts. Tap the bottom bar to return, or swipe left/right to switch faces as before.
+
+The collector reads Crew’s cached local Kiro CLI session aggregates every 120 seconds, independently of billing reads and the 250 ms live status checks. Only aggregate counts are sent to the device; transcript contents are not included. Missing statistics show unavailable, refresh failures preserve the last reading as stale, and refused transcripts show partial data. Older firmware ignores this optional protocol field.
+
+These statistics match Crew Settings → Overview → Usage. They describe local CLI transcript history, not all account activity. Crew groups a session and its message/tool totals by the session’s first timestamp, using local calendar day/week/month boundaries and its 30-day transcript scan. This is not an exact per-event daily ledger. The adapter is bound to Crew’s internal cached parser and degrades to unavailable if that API changes.

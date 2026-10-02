@@ -1,6 +1,6 @@
 {
   "name": "kirometer",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "displayName": "Kirometer",
   "description": "A little companion for your Kiro day. See credit usage and activity on your desk, connect over Bluetooth, and make your Kirometer feel like yours. Includes guided USB firmware setup and device controls for macOS.",
   "minKiroCrewVersion": "0.7.2",
@@ -34,7 +34,9 @@
       "/api/apps/kirometer/snapshot",
       "/api/apps/kirometer/health",
       "/api/apps/kirometer/devices",
-      "/api/apps/kirometer/settings"
+      "/api/apps/kirometer/settings",
+      "/api/apps/kirometer/faces",
+      "/api/apps/kirometer/faces/*"
     ],
     "network": false,
     "storage": false
@@ -58,7 +60,8 @@
         "stale_after": {
           "type": "integer",
           "minimum": 0,
-          "default": 300
+          "default": 3600,
+          "description": "Usage becomes stale after one hour by default; collection and live activity run independently."
         }
       }
     }
@@ -72,11 +75,11 @@
   "heroImageDetailDark": "ui/art/banner-kiro-dark.svg",
   "screenshots": [
     "ui/art/screenshot-device-light.png",
-    "ui/art/screenshot-setup-light.png"
+    "ui/art/screenshot-gallery-light.png"
   ],
   "screenshotsDark": [
     "ui/art/screenshot-device-dark.png",
-    "ui/art/screenshot-setup-dark.png"
+    "ui/art/screenshot-gallery-dark.png"
   ],
   "useCases": [
     "Keep Kiro credits, remaining allowance, overage, and activity visible on a small desk display.",

@@ -24,9 +24,10 @@ def default_db(platform=None, environ=None, home=None):
 
 
 DEFAULT_DB = default_db()
+DEFAULT_STALE_AFTER = 3600
 
 
-def normalize(state, now=None, stale_after=300):
+def normalize(state, now=None, stale_after=DEFAULT_STALE_AFTER):
     now = time.time() if now is None else now
     stamp = state.get('timestamp')
     age = max(0, now - stamp / 1000) if isinstance(stamp, (int, float)) else None
@@ -54,7 +55,7 @@ def normalize(state, now=None, stale_after=300):
     }
 
 
-def read_usage(path=DEFAULT_DB, stale_after=300):
+def read_usage(path=DEFAULT_DB, stale_after=DEFAULT_STALE_AFTER):
     with sqlite3.connect(Path(path).resolve().as_uri() + '?mode=ro', uri=True) as db:
         row = db.execute("SELECT value FROM ItemTable WHERE key = ?", ('kiro.kiroAgent',)).fetchone()
     if row is None:
@@ -69,7 +70,7 @@ def read_usage(path=DEFAULT_DB, stale_after=300):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--db', type=Path, default=DEFAULT_DB)
-    parser.add_argument('--stale-after', type=int, default=300)
+    parser.add_argument('--stale-after', type=int, default=DEFAULT_STALE_AFTER)
     args = parser.parse_args()
     if args.stale_after < 0:
         parser.error('--stale-after must be nonnegative')
