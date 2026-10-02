@@ -22,6 +22,7 @@ This is the project standard for firmware, the Kiro Crew app, screen previews, a
 | Firmware face hero metrics | Space Grotesk Bold | 64 / 80 / 120 px |
 | Crew app body and controls | Inherit Crew's active font | 14–16 px; regular body, semibold controls |
 | Crew app page title / section headings | Inherit Crew's active font | 28–32 / 18–20 px |
+| Library detail banners | Space Grotesk Regular / Bold, outlined for reliable SVG rendering | Preserve the light/dark artwork palette |
 | Website-style marketing previews | AWS Diatype; rounded semi-mono headings where available | Use the existing website preview stylesheet |
 
 **Firmware standard: Space Grotesk**, the default Kiro Crew interface font. The Kiro website uses AWS Diatype and AWS Diatype Rounded Semi-Mono, but its font metadata restricts modification and redistribution. Do not package those web fonts or derivative bitmaps in releases without separate permission. Space Grotesk is distributed under SIL OFL 1.1; retain its license with firmware packages.
@@ -171,3 +172,34 @@ library; do not mix icon families by default.
 7. Build the firmware bundle with notices, update the changelog, and package only supported layouts.
 
 Keep this document updated when an accepted design decision changes. A passing build proves compilation; browser checks prove app behavior; a successful flash proves delivery; physical viewing proves device appearance. Report those separately.
+
+### Crew app icon rendering contract
+
+- Use the canonical `crew-app/ui/art/icon-crew.svg`: 24 × 24, 1.8-unit primary strokes, 1.4-unit details, rounded caps/joins, neutral fill at 20% opacity. Match the built-in Notes, Research Lab, Dev Fleet, and Meetings definitions.
+- Structure uses `var(--ico-a, currentColor)`; accent uses `var(--ico-b, currentColor)`. Crew maps these to `--muted` / `--accent`, and to `--accent` / `--text` on hover/selection. Use the `app-icon` wrapper for inline artwork.
+- Installed Crew currently inlines only its own `/app-assets/<app>/<file>.svg` URLs. External `iconPath` / `iconPathDark` assets render as images, so host CSS variables do not cross into them. Generate those fallbacks with `python3 scripts/build_app_icon.py`; never hand-invert the SVG.
+- Generated image variants use Kiro light/dark neutrals #5e5966 / #938f9b and accent #8e48ff. Their responsive inset matches Crew's 30 px Library icon in a 58 px tile and 64 px Detail icon in a 96 px tile; small sidebar images remain full size. Recheck these adapters when Crew changes its renderer.
+- Inline icons inherit custom host themes and interaction tokens. Local fallback declarations must use zero-specificity `:where(...)` so they cannot override Crew's `.app-icon` state selectors. A decorative icon does not itself imply an interactive hover target.
+- External image icons retain the explicit Kiro palette. **Library/sidebar hover recoloring is not implemented for external apps by the installed Crew renderer.** Matching static variants is not equivalent to matching interaction states.
+
+#### Verified Crew icon states (installed build, October 1, 2026)
+
+| State | Structure `--ico-a` | Accent `--ico-b` | Treatment |
+| --- | --- | --- | --- |
+| Enabled, resting | `--muted` | `--accent` | Normal opacity |
+| Hovered parent group/link/button | `--accent` | `--text` | 200 ms fill/stroke/fill-opacity transition |
+| Selected / lit navigation item | `--accent` | `--text` | Same color mapping as hover |
+| Disabled Library app | State mapping above | State mapping above | Entire icon tile: grayscale, opacity 0.45 |
+
+Kiro light resolves muted/accent/text to `#5e5966` / `#8e48ff` / `#4a464f`; Kiro dark resolves them to `#938f9b` / `#8e48ff` / `#dcdadf`. This is token reassignment, not an inversion filter. Enabled status and selected status are separate.
+
+Crew's `AppIcon` only inlines sanitized SVGs from `/app-assets/<app>/<file>.svg`. App-provided `iconPath` and `iconPathDark` become image URLs, and there is no manifest field for a hover variant. The host needs explicit, sanitized external-SVG support to make Library/sidebar interactions match. Do not spoof a built-in asset URL, inject global Library styles from the app, or patch the signed installed Crew bundle as an app-level workaround.
+
+## Custom screen designer (Beta)
+
+Custom faces use the same Space Grotesk fonts and official ghost as built-in faces.
+The v1 palette is white, muted, purple, green, red, and panel. Reserve y=0–51
+and y=424–479 for firmware status and navigation. The content area is x=12–467,
+y=52–423. Use 20/24/36/48 px type, generous metric boxes, and legible contrast.
+Generated faces are declarative data; no scripts, custom fonts, URLs, or changes
+to core behavior. Label the designer and custom device footer **Beta**.

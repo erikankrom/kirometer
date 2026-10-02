@@ -1,0 +1,179 @@
+{
+  "parameters_mm": {
+    "stock_width": 46.0,
+    "stock_height": 46.0,
+    "stock_depth": 22.5,
+    "clearance_per_side": 0.4,
+    "front_thickness": 2.4,
+    "screen_seat": 0.8,
+    "body_depth": 27.5,
+    "cover_thickness": 2.4,
+    "window": 44.4,
+    "pocket_radius": 6.2,
+    "pocket_wall": 2.4,
+    "usb_width": 16.0,
+    "usb_height": 8.0,
+    "adapter_front_offset": 5.0,
+    "adapter_fit": "UGREEN_B0FNCT8NS7_16mm_channel_physical_fit_pending",
+    "button_center_from_front": 9.6,
+    "button_diameter": 5.3,
+    "button_wall_base_z": 3.2,
+    "button_wall_top_z": 2.4,
+    "button_access": "direct_buttons_near_vertical_wall_with_cover_tongue",
+    "revision": "v9",
+    "desk_tilt_degrees": 15.0,
+    "rear_tail_extension": 8.5,
+    "target_body_width": 66.0,
+    "target_body_height": 80.0,
+    "maximum_depth": 29.9,
+    "ground_y": -39.3,
+    "closure_slide_travel": 0.0,
+    "closure_clearance": 0.04,
+    "socket_diameter": 2.68,
+    "peg_root_diameter": 2.64,
+    "closure_type": "vertical_tapered_peg_friction_fit",
+    "print_design": "support_minimized_45_degree_roofs_and_tapers"
+  },
+  "parts": {
+    "kirometer-ghost-body.stl": {
+      "non_manifold_edges": 0,
+      "connected_components": 1,
+      "volume_mm3": 32392.56,
+      "bounds_mm": [
+        65.992,
+        79.685,
+        29.9
+      ]
+    },
+    "kirometer-rear-cover.stl": {
+      "non_manifold_edges": 0,
+      "connected_components": 1,
+      "volume_mm3": 8793.44,
+      "bounds_mm": [
+        65.992,
+        70.311,
+        7.4
+      ]
+    },
+    "kirometer-fit-coupon.stl": {
+      "non_manifold_edges": 0,
+      "connected_components": 1,
+      "volume_mm3": 7451.04,
+      "bounds_mm": [
+        64.0,
+        54.0,
+        8.0
+      ]
+    }
+  },
+  "stock_envelope_overlap_mm3": 0.0,
+  "seated_cover_overlap_mm3": {
+    "body": 0.0,
+    "factory_housing": 0.0
+  },
+  "sampled_cover_assembly_motion": [
+    {
+      "y_offset_mm": 0,
+      "z_offset_mm": 6,
+      "overlap_mm3": 0.0
+    },
+    {
+      "y_offset_mm": 0,
+      "z_offset_mm": 4,
+      "overlap_mm3": 0.0
+    },
+    {
+      "y_offset_mm": 0,
+      "z_offset_mm": 2,
+      "overlap_mm3": 0.0
+    },
+    {
+      "y_offset_mm": 0,
+      "z_offset_mm": 1,
+      "overlap_mm3": 0.0
+    },
+    {
+      "y_offset_mm": 0,
+      "z_offset_mm": 0.5,
+      "overlap_mm3": 0.0
+    },
+    {
+      "y_offset_mm": 0,
+      "z_offset_mm": 0.2,
+      "overlap_mm3": 0.0
+    },
+    {
+      "y_offset_mm": 0,
+      "z_offset_mm": 0,
+      "overlap_mm3": 0.0
+    }
+  ],
+  "button_access": {
+    "drawing_url": "https://docs.waveshare.com/assets/images/ESP32-S3-Touch-AMOLED-2.16-details-size-9be8e99d5f546b1b8ce338c394d988fd.webp",
+    "center_from_factory_front_mm": 9.6,
+    "center_from_printed_front_mm": 10.4,
+    "button_diameter_mm": 5.3,
+    "center_spacing_mm": 10,
+    "minimum_depth_gap_to_front_wall_mm": 4.55,
+    "wall_slope_degrees_from_case_vertical": 3.85,
+    "side_gap_at_outer_buttons_mm": 4.75,
+    "tested_finger_corridor_diameter_mm": 12,
+    "cap_height_test_allowance_mm": 1.5,
+    "note": "Cap height and travel are not dimensioned in the official drawing. Finger corridor is a geometric proxy; physical ergonomics remain unverified.",
+    "access_overlap_mm3": {
+      "-10_cap_envelope": {
+        "body": 0.0,
+        "cover": 0.0
+      },
+      "-10_finger_approach_12mm": {
+        "body": 0.0,
+        "cover": 0.0
+      },
+      "0_cap_envelope": {
+        "body": 0.0,
+        "cover": 0.0
+      },
+      "0_finger_approach_12mm": {
+        "body": 0.0,
+        "cover": 0.0
+      },
+      "10_cap_envelope": {
+        "body": 0.0,
+        "cover": 0.0
+      },
+      "10_finger_approach_12mm": {
+        "body": 0.0,
+        "cover": 0.0
+      }
+    }
+  },
+  "button_and_adapter_clearance_checks_mm3": {
+    "Factory button - reference only": {
+      "body": 0.0,
+      "cover": 0.0
+    },
+    "Factory button - reference only.001": {
+      "body": 0.0,
+      "cover": 0.0
+    },
+    "Factory button - reference only.002": {
+      "body": 0.0,
+      "cover": 0.0
+    },
+    "adapter_approximate_envelope": {
+      "body": 0.0,
+      "cover": 0.0
+    }
+  },
+  "adapter_reference": {
+    "url": "https://www.amazon.com/dp/B0FNCT8NS7",
+    "listing_dimensions_mm": [
+      21.1,
+      11.9,
+      6.1
+    ],
+    "orientation_and_inserted_position": "inferred from user photos; physical fit unverified",
+    "opening_width_mm": 16
+  },
+  "physical_validation": "Pending revised coupon and assembly print"
+}

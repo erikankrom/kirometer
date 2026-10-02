@@ -59,6 +59,23 @@ class CrewCollectorTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(collector._snapshot)
 
 class CrewBillingTests(unittest.TestCase):
+    def test_usage_age_is_independent_of_five_minute_polling(self):
+        from kirometer_test_backend.usage import normalize
+        cache={'credits_used':3.4,'credits_plan':1000}
+        for age,stale in ((305,False),(3599,False),(3600,False),(3601,True)):
+            with self.subTest(age=age):
+                self.assertEqual(collector.normalize_crew(cache,10000-age,10000)['stale'],stale)
+                self.assertEqual(normalize({'timestamp':(10000-age)*1000},now=10000)['stale'],stale)
+        self.assertTrue(collector.normalize_crew(cache,0,10000)['stale'])
+        self.assertTrue(collector.normalize_crew(cache,9990,10000,stale_after=5)['stale'])
+
+    def test_billing_collection_uses_configured_threshold(self):
+        from unittest.mock import patch
+        sample=collector.normalize_crew({'credits_used':1,'credits_plan':1000},990,1000)
+        with patch.object(collector,'crew_usage',return_value=sample) as read:
+            collector.collect({'stale_after':7200})
+            read.assert_called_once_with(stale_after=7200)
+
     def test_crew_total_credits_and_freshness(self):
         d=collector.normalize_crew({'credits_used':625,'credits_plan':500,'plan':'KIRO PRO'},990,1000)
         self.assertEqual(d['credits'][0]['overage_used'],125)
@@ -121,12 +138,13 @@ class IndependentCadenceTests(unittest.IsolatedAsyncioTestCase):
 
     def test_cached_age_advances_without_recollection(self):
         from unittest.mock import patch
-        with patch.object(collector,'_snapshot',{'age_seconds':280,'stale':False}),patch.object(collector,'_usage_collected_mono',100),patch.object(collector,'_settings',{'poll_seconds':300,'stale_after':300}):
+        with patch.object(collector,'_snapshot',{'age_seconds':3580,'stale':False}),patch.object(collector,'_usage_collected_mono',100),patch.object(collector,'_settings',{'poll_seconds':300,'stale_after':3600}):
+            self.assertFalse(collector.current_snapshot(120)['stale'])
             data=collector.current_snapshot(125)
-            self.assertEqual(data['age_seconds'],305)
+            self.assertEqual(data['age_seconds'],3605)
             self.assertTrue(data['stale'])
             self.assertEqual(data['next_usage_poll_seconds'],275)
-            self.assertEqual(collector._snapshot['age_seconds'],280)
+            self.assertEqual(collector._snapshot['age_seconds'],3580)
 
     async def test_settings_persist_preserve_other_config_and_reschedule(self):
         from unittest.mock import patch,AsyncMock

@@ -16,7 +16,7 @@ class DeviceTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as root:
             ctx = types.SimpleNamespace(data_dir=root)
             inventory = [{'device':'/dev/cu.shared','vid':0x303A,'pid':0x1001,'serial_number':'44:BD:8D:60:DA:5C'}]
-            with patch.object(devices, '_history_path', None), patch.object(devices, '_history', []), patch.object(devices, '_job', None), patch.object(devices, '_task', None), patch.object(devices, '_link', {'connected':True,'transport':'bluetooth','status':{'device_id':'10da608dbd44','device_name':'Other device'}}), patch.object(devices.sys, 'platform', 'darwin'), patch.object(devices, 'tools_ready', return_value=True), patch.object(devices, 'check_port'), patch.object(devices, 'port_inventory', new_callable=AsyncMock, return_value=inventory), patch.object(devices, 'disconnect', new_callable=AsyncMock), patch.object(devices, 'worker', new_callable=AsyncMock):
+            with patch.object(devices, '_history_path', None), patch.object(devices, '_history', []), patch.object(devices, '_job', None), patch.object(devices, '_task', None), patch.object(devices, '_sessions', {'other': devices.DeviceSession({'id':'other','device_id':'10da608dbd44','name':'Other device'})}), patch.object(devices.sys, 'platform', 'darwin'), patch.object(devices, 'tools_ready', return_value=True), patch.object(devices, 'check_port'), patch.object(devices, 'port_inventory', new_callable=AsyncMock, return_value=inventory), patch.object(devices, 'disconnect', new_callable=AsyncMock), patch.object(devices, 'worker', new_callable=AsyncMock):
                 job = await devices.start('flash', ctx, '/dev/cu.shared', {'version':'test'})
                 await devices._task
                 self.assertEqual(job['device']['device_id'], '5cda608dbd44')
@@ -122,30 +122,40 @@ class ControlsTest(unittest.TestCase):
             with self.assertRaises(ValueError):devices.validate_controls(payload)
 
 class ReconnectTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.session = devices.DeviceSession({'id':'test','port':'device','transport':'bluetooth'})
+        self.registry_patch = patch.object(devices, '_registry_path', None)
+        self.registry_patch.start()
+        self.addCleanup(self.registry_patch.stop)
+
     async def test_backoff_caps_and_resets_after_success(self):
         from unittest.mock import AsyncMock
         waits=[]
         async def pause(seconds):
             waits.append(seconds)
-            self.assertFalse(devices._link['connected'])
-            self.assertIsNone(devices._link['status'])
-            self.assertTrue(devices._link['reconnecting'])
-            if len(waits)==6:raise asyncio.CancelledError()
-        attempts=AsyncMock(side_effect=[(True,False)]*5+[(True,True)])
-        with patch.object(devices,'bridge_once',attempts),patch.object(devices.asyncio,'sleep',side_effect=pause):
-            with self.assertRaises(asyncio.CancelledError):await devices.bridge(None,'device','bluetooth')
-        self.assertEqual(waits,[5,10,20,30,30,5])
+            self.assertFalse(self.session.link['connected'])
+            self.assertIsNone(self.session.link['status'])
+            self.assertTrue(self.session.link['reconnecting'])
+            if len(waits)==9:raise asyncio.CancelledError()
+        clock=[0]
+        async def attempt(*args):
+            clock[0] += 40
+            return True, len(waits) == 8
+        attempts=AsyncMock(side_effect=attempt)
+        with patch.object(devices,'bridge_once',attempts),patch.object(devices.asyncio,'sleep',side_effect=pause), patch.object(devices,'time',types.SimpleNamespace(monotonic=lambda:clock[0])):
+            with self.assertRaises(asyncio.CancelledError):await devices.bridge(None,'device','bluetooth',self.session)
+        self.assertEqual(waits,[5,10,20,40,80,160,300,300,5])
 
     async def test_pairing_failure_is_terminal(self):
         from unittest.mock import AsyncMock
         with patch.object(devices,'bridge_once',AsyncMock(return_value=(False,False))) as attempt,patch.object(devices.asyncio,'sleep',AsyncMock()) as pause:
-            await devices.bridge(None,'device','bluetooth')
+            await devices.bridge(None,'device','bluetooth',self.session)
             attempt.assert_awaited_once();pause.assert_not_awaited()
 
     async def test_usb_does_not_reopen_missing_port(self):
         from unittest.mock import AsyncMock
         with patch.object(devices,'bridge_once',AsyncMock(return_value=(True,True))) as attempt,patch.object(devices.asyncio,'sleep',AsyncMock()) as pause:
-            await devices.bridge(None,'/dev/cu.test','usb')
+            await devices.bridge(None,'/dev/cu.test','usb',self.session)
             attempt.assert_awaited_once();pause.assert_not_awaited()
 
     async def test_explicit_disconnect_cancels_pending_retry(self):
@@ -154,11 +164,12 @@ class ReconnectTests(unittest.IsolatedAsyncioTestCase):
         async def pause(seconds):
             waiting.set();await release.wait()
         with patch.object(devices,'bridge_once',AsyncMock(return_value=(True,False))) as attempt,patch.object(devices.asyncio,'sleep',side_effect=pause):
-            devices._link_task=asyncio.create_task(devices.bridge(None,'device','bluetooth'))
+            self.session.task=asyncio.create_task(devices.bridge(None,'device','bluetooth',self.session))
             await waiting.wait()
-            await devices.disconnect()
-            self.assertIsNone(devices._link_task)
-            self.assertIsNone(devices._link['port'])
+            await devices.stop_session(self.session, pause=True)
+            self.assertIsNone(self.session.task)
+            self.assertEqual(self.session.link['port'], 'device')
+            self.assertFalse(self.session.record['auto_connect'])
             attempt.assert_awaited_once()
 
     async def test_worker_pairing_error_stops_and_cleans_up(self):
@@ -166,7 +177,7 @@ class ReconnectTests(unittest.IsolatedAsyncioTestCase):
         ctx=types.SimpleNamespace(data_dir='/tmp/unused')
         proc=types.SimpleNamespace(stdin=types.SimpleNamespace(write=Mock(),drain=AsyncMock()),stdout=types.SimpleNamespace(readline=AsyncMock(return_value=b'{"error_code":"bond_removed"}\n')),returncode=None,kill=Mock(),wait=AsyncMock())
         with patch.object(devices.asyncio,'create_subprocess_exec',AsyncMock(return_value=proc)),patch.object(devices,'pairing',return_value={'token':'fixture'}):
-            retry,delivered=await devices.bridge_once(ctx,'device','bluetooth')
+            retry,delivered=await devices.bridge_once(ctx,'device','bluetooth',self.session)
         self.assertFalse(retry);self.assertFalse(delivered)
         proc.kill.assert_called_once();proc.wait.assert_awaited_once()
 

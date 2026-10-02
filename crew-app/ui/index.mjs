@@ -1,5 +1,9 @@
+import { AnimatedPreview } from "./animated-preview.mjs";
+import { CustomFaces } from "./custom-faces.mjs";
+import { deviceIconSvg } from "./app-icon.mjs";
 import { icons, batteryIcon } from "./icons.mjs";
-import { updatesForDevice } from "./firmware-history.mjs";
+import { updatesForDevice, newerFirmware } from "./firmware-history.mjs";
+import { galleryScreens } from "./gallery-screens.mjs";
 import { screenLayouts } from "./layouts.mjs";
 const { react: React, "@kirocrew/app-sdk": sdk } = window.__kirocrew_modules;
 const { createElement: h, useState, useEffect, useRef } = React;
@@ -8,13 +12,14 @@ const { createElement: h, useState, useEffect, useRef } = React;
 const styles = `
 .km{--km-purple:#9147ff;--km-tint:color-mix(in srgb,var(--km-purple) 12%,var(--bg-elevated,#fff));color:var(--text,#211d26);font-family:inherit;box-sizing:border-box;width:100%;max-width:none;margin:0;padding:32px;line-height:1.5;font-variant-numeric:tabular-nums}
 .km *{box-sizing:border-box}.km .km-icon{display:inline-flex;vertical-align:middle;flex-shrink:0;margin-right:7px}.km .km-icon svg{width:20px;height:20px}.km dd .km-icon{vertical-align:-4px}.km h1,.km h2,.km h3,.km p{margin:0}.km h1{font-size:32px;letter-spacing:-1px;font-weight:700}.km h2{font-size:23px;letter-spacing:-.5px}.km h3{font-size:17px}.km p{max-width:65ch}.km .muted{color:var(--muted-strong,var(--muted,#686170))}.km .small{font-size:13px}.km .eyebrow{font-size:12px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--muted,#686170)}
-.km .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.km .spread{justify-content:space-between}.km .stack{display:grid;gap:16px}.km .gap{margin-top:24px}.km .panel{background:var(--bg-elevated,#fff);border:1px solid var(--border,#ddd8e2);border-radius:16px;padding:24px}.km .subtle{background:var(--bg,#f5f3f8);border-radius:10px;padding:16px}.km .layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:24px;align-items:start}.km .device-head{display:flex;align-items:center;gap:16px}.km .device-title{overflow-wrap:anywhere}.km .device-icon{flex:0 0 64px;width:64px;height:64px;background:var(--km-tint);border-radius:18px;display:grid;place-items:center;color:var(--text,#211d26)}.km .device-icon svg{width:40px;height:40px}
+.km .page-nav{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap}.km .page-nav a{color:var(--muted-strong,var(--text));text-decoration:none;font-size:14px;font-weight:600;padding:10px 14px;border-radius:9px;white-space:nowrap}.km .page-nav a:hover{background:var(--bg-hover,#eee8f5);color:var(--text)}.km .page-nav a[aria-current=page]{background:var(--km-tint);color:var(--accent,var(--km-purple))}.km .page-nav a:focus-visible{outline:3px solid var(--km-purple);outline-offset:3px}.km .header-right{margin-left:auto;display:grid;justify-items:end;gap:12px}.km [hidden]{display:none!important}
+.km .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.km .spread{justify-content:space-between}.km .stack{display:grid;gap:16px}.km .gap{margin-top:24px}.km .panel{background:var(--bg-elevated,#fff);border:1px solid var(--border,#ddd8e2);border-radius:16px;padding:24px}.km .subtle{background:var(--bg,#f5f3f8);border-radius:10px;padding:16px}.km .layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px;align-items:start}.km .device-head{display:flex;align-items:center;gap:16px}.km .device-title{overflow-wrap:anywhere}.km .device-icon{flex:0 0 64px;width:64px;height:64px;background:var(--km-tint);border-radius:18px;display:grid;place-items:center;color:var(--text,#211d26)}:where(.km .device-icon){--ico-a:var(--muted,#5e5966);--ico-b:var(--accent,#8e48ff)}.km .device-icon svg{width:40px;height:40px}
 .km button{appearance:none;font:inherit;font-size:14px;font-weight:600;cursor:pointer;border:1px solid var(--border-strong,var(--border,#d3cbdc));background:var(--bg-elevated,#fff);color:var(--text,#211d26);border-radius:9px;min-height:42px;padding:9px 15px;transition:background .15s,border-color .15s}.km button:hover:not(:disabled){background:var(--bg-hover,#eee8f5)}.km button:active:not(:disabled){transform:translateY(1px)}.km button.primary{background:var(--km-purple);border-color:var(--km-purple);color:white}.km button.primary:hover:not(:disabled){background:#7836dc}.km button.quiet{background:transparent;border-color:transparent}.km button:disabled{opacity:.46;cursor:not-allowed}.km :is(button,input,select,summary):focus-visible{outline:3px solid var(--km-purple);outline-offset:3px}.km button.danger{color:var(--danger,#b4233c)}
 .km .badge{font-size:12px;font-weight:650;border-radius:6px;background:var(--km-tint);padding:4px 9px}.km .status{font-size:13px;display:inline-flex;align-items:center;gap:7px}.km .dot{width:7px;height:7px;border-radius:50%;background:var(--muted,#686170)}.km .online .dot{background:var(--ok,#218445)}.km .notice{padding:12px 15px;background:var(--bg,#f5f3f8);border-left:3px solid var(--km-purple);border-radius:5px;font-size:14px;overflow-wrap:anywhere}.km .notice.error{border-color:var(--danger,#b4233c);color:var(--danger,#b4233c)}.km .notice.success{border-color:var(--ok,#218445)}
-.km .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border,#ddd8e2);margin:24px -24px 20px;padding:0 24px;overflow:auto}.km .tabs button{border:0;border-radius:0;background:transparent;white-space:nowrap;padding:12px 8px;border-bottom:3px solid transparent;min-height:48px}.km .tabs button[aria-selected=true]{border-bottom-color:var(--km-purple);font-weight:750}.km .fields{display:grid;grid-template-columns:1fr 1fr;gap:20px}.km label.field{display:grid;gap:7px;font-size:14px;font-weight:600}.km label.field .hint{font-size:12px;font-weight:400;color:var(--muted-strong,var(--muted,#686170))}.km input:not([type=checkbox]):not([type=radio]):not([type=range]),.km select{font:inherit;font-size:15px;background:var(--bg,#f5f3f8);color:var(--text,#211d26);border:1px solid var(--border-strong,var(--border,#d3cbdc));border-radius:8px;padding:10px 12px;min-height:44px;width:100%}.km input[type=range]{width:100%;accent-color:var(--km-purple);min-height:32px}.km input[type=checkbox],.km input[type=radio]{accent-color:var(--km-purple);width:17px;height:17px;flex-shrink:0}.km fieldset{border:0;margin:0;padding:0;min-width:0}.km .save{border-top:1px solid var(--border,#ddd8e2);padding-top:18px;margin-top:20px}.km .numbers{font-size:32px;letter-spacing:-1px;font-weight:650;line-height:1.25}.km .meter{height:8px;border-radius:8px;background:var(--border,#ddd8e2);overflow:hidden;display:flex}.km .meter .used{background:var(--km-purple)}.km .meter .over{background:var(--danger,#b4233c)}.km dl{margin:0;display:grid;gap:12px}.km dl>div{display:flex;justify-content:space-between;gap:18px;font-size:13px}.km dt{color:var(--muted-strong,var(--muted,#686170))}.km dd{margin:0;text-align:right;overflow-wrap:anywhere}.km .divider{height:1px;background:var(--border,#ddd8e2)}.km .empty{display:grid;justify-items:start;gap:15px}.km .options{display:grid;grid-template-columns:1fr 1fr;gap:14px}.km .choice{text-align:left!important;padding:20px!important;display:grid;gap:6px}.km .choice span{font-weight:400;font-size:13px;color:var(--muted-strong,var(--muted,#686170))}.km .steps{list-style:none;padding:0;margin:20px 0;display:flex;gap:12px;font-size:13px}.km .steps li{flex:1;padding-top:9px;border-top:3px solid var(--border,#ddd8e2);color:var(--muted-strong,var(--muted,#686170))}.km .steps li.current{border-color:var(--km-purple);color:var(--text,#211d26);font-weight:650}.km .device-list{display:grid;gap:8px;padding:0;list-style:none;margin:0}.km .device-list li label{display:flex;gap:12px;align-items:center;padding:14px;border:1px solid var(--border,#ddd8e2);border-radius:9px;cursor:pointer}.km .device-list small{display:block;color:var(--muted-strong,var(--muted,#686170))}.km details summary{font-size:13px;cursor:pointer;color:var(--muted-strong,var(--muted,#686170));padding:8px 0}.km details>div{margin-top:10px}.km .confirm{display:flex;gap:10px;align-items:flex-start;font-size:13px}.km .footer{font-size:12px;color:var(--muted-strong,var(--muted,#686170));margin-top:20px}.km .loading{min-height:170px;display:grid;place-content:center;color:var(--muted,#686170)}
+.km .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border,#ddd8e2);margin:24px -24px 20px;padding:0 24px;overflow:auto}.km .tabs button{border:0;border-radius:0;background:transparent;white-space:nowrap;padding:12px 8px;border-bottom:3px solid transparent;min-height:48px}.km .tabs button[aria-selected=true]{border-bottom-color:var(--km-purple);font-weight:750}.km .fields{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}.km label.field{display:grid;align-content:start;gap:7px;font-size:14px;font-weight:600}.km label.field .hint{font-size:12px;font-weight:400;color:var(--muted-strong,var(--muted,#686170))}.km input:not([type=checkbox]):not([type=radio]):not([type=range]),.km select{font:inherit;font-size:15px;background:var(--bg,#f5f3f8);color:var(--text,#211d26);border:1px solid var(--border-strong,var(--border,#d3cbdc));border-radius:8px;padding:10px 12px;min-height:44px;width:100%}.km input[type=range]{width:100%;accent-color:var(--km-purple);min-height:32px}.km input[type=checkbox],.km input[type=radio]{accent-color:var(--km-purple);width:17px;height:17px;flex-shrink:0}.km fieldset{border:0;margin:0;padding:0;min-width:0}.km .save{border-top:1px solid var(--border,#ddd8e2);padding-top:18px;margin-top:20px}.km .numbers{font-size:32px;letter-spacing:-1px;font-weight:650;line-height:1.25}.km .meter{height:8px;border-radius:8px;background:var(--border,#ddd8e2);overflow:hidden;display:flex}.km .meter .used{background:var(--km-purple)}.km .meter .over{background:var(--danger,#b4233c)}.km dl{margin:0;display:grid;gap:12px}.km dl>div{display:flex;justify-content:space-between;gap:18px;font-size:13px}.km dt{color:var(--muted-strong,var(--muted,#686170))}.km dd{margin:0;text-align:right;overflow-wrap:anywhere}.km .divider{height:1px;background:var(--border,#ddd8e2)}.km .empty{display:grid;justify-items:start;gap:15px}.km .options{display:grid;grid-template-columns:1fr 1fr;gap:14px}.km .choice{text-align:left!important;padding:20px!important;display:grid;gap:6px}.km .choice span{font-weight:400;font-size:13px;color:var(--muted-strong,var(--muted,#686170))}.km .steps{list-style:none;padding:0;margin:20px 0;display:flex;gap:12px;font-size:13px}.km .steps li{flex:1;padding-top:9px;border-top:3px solid var(--border,#ddd8e2);color:var(--muted-strong,var(--muted,#686170))}.km .steps li.current{border-color:var(--km-purple);color:var(--text,#211d26);font-weight:650}.km .device-list{display:grid;gap:8px;padding:0;list-style:none;margin:0}.km .device-list li label{display:flex;gap:12px;align-items:center;padding:14px;border:1px solid var(--border,#ddd8e2);border-radius:9px;cursor:pointer}.km .device-list small{display:block;color:var(--muted-strong,var(--muted,#686170))}.km details summary{font-size:13px;cursor:pointer;color:var(--muted-strong,var(--muted,#686170));padding:8px 0}.km details>div{margin-top:10px}.km .confirm{display:flex;gap:10px;align-items:flex-start;font-size:13px}.km .footer{font-size:12px;color:var(--muted-strong,var(--muted,#686170));margin-top:20px}.km .loading{min-height:170px;display:grid;place-content:center;color:var(--muted,#686170)}
 .km .layout-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-top:12px}.km .screen-card{border:2px solid var(--border,#ddd8e2);border-radius:14px;padding:12px;display:grid;align-content:start;gap:12px;cursor:pointer;transition:border-color .15s,background .15s}.km .screen-card.selected{border-color:var(--km-purple);background:var(--km-tint)}.km .screen-card:has(input:focus-visible){outline:3px solid var(--km-purple);outline-offset:3px}.km .screen-card img{width:100%;height:auto;aspect-ratio:1;display:block;border-radius:9px;background:#000}.km .screen-card .card-title{display:flex;align-items:center;gap:8px;font-size:14px}.km .screen-card .card-title input{margin:0}.km .screen-card p{font-size:12px;color:var(--muted-strong,var(--muted,#686170));line-height:1.5}.km .screen-card .choice-state{font-size:11px;font-weight:600;color:var(--km-purple)}.km fieldset:disabled .screen-card{cursor:default}.km .firmware-console{background:#08080b;color:#e6e1ef;padding:16px;border-radius:10px;max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 ui-monospace,monospace}.km summary{cursor:pointer}.km .gallery-legend{font-size:14px;font-weight:650}.km .gallery-note{margin-top:12px;font-size:12px;color:var(--muted-strong,var(--muted,#686170))}
-.km .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:24px}.km .info-section{min-width:0;display:grid;align-content:start;gap:16px}.km .info-section dl>div{padding-bottom:10px;border-bottom:1px solid var(--border,#ddd8e2);align-items:baseline}.km .info-section dt{flex:0 0 42%}.km .info-section dd{min-width:0}.km .info-section code{font-size:12px;overflow-wrap:anywhere}.km .info-port{padding:16px;border:1px solid var(--border,#ddd8e2);border-radius:10px;display:grid;gap:12px}
-@media(max-width:950px){.km .layout{grid-template-columns:1fr}.km aside{order:2}.km aside .stack{gap:12px}}@media(max-width:600px){.km{padding:18px}.km .panel{padding:18px}.km .fields,.km .options{grid-template-columns:1fr}.km .tabs{margin-left:-18px;margin-right:-18px;padding:0 18px}.km h1{font-size:28px}.km .device-icon{width:48px;height:48px;flex-basis:48px}.km .steps{gap:8px;font-size:12px}}
+.km button.firmware-update{background:var(--km-tint);color:var(--accent,var(--km-purple));border-color:color-mix(in srgb,var(--km-purple) 40%,var(--border));font-size:13px;text-align:left}.km .configured-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:18px}.km .configured-card{min-width:0;display:grid;gap:18px;align-content:start}.km .add-device-card{border-style:dashed;border-color:color-mix(in srgb,var(--km-purple) 45%,var(--border,#ddd8e2));background:var(--bg,#f5f3f8);align-content:center;gap:20px;min-height:280px}.km .add-device-card .choice{width:100%;background:var(--bg-elevated,#fff)}.km .add-device-card .choice:hover:not(:disabled){border-color:var(--km-purple);background:var(--km-tint)}.km .add-device-card .choice strong{display:flex;align-items:center;color:var(--accent,var(--km-purple))}.km .configured-card.selected{border-color:var(--km-purple)}.km .configured-card .device-icon{width:48px;height:48px;flex-basis:48px;border-radius:13px}.km .configured-card .device-icon svg{width:30px;height:30px}.km .configured-card h3{overflow-wrap:anywhere}.km .configured-card .device-head{align-items:flex-start}.km .configured-card .retry-note{min-height:40px}.km .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:24px}.km .info-section{min-width:0;display:grid;align-content:start;gap:16px}.km .info-section dl>div{padding-bottom:10px;border-bottom:1px solid var(--border,#ddd8e2);align-items:baseline}.km .info-section dt{flex:0 0 42%}.km .info-section dd{min-width:0}.km .info-section code{font-size:12px;overflow-wrap:anywhere}.km .info-port{padding:16px;border:1px solid var(--border,#ddd8e2);border-radius:10px;display:grid;gap:12px}
+@media(max-width:950px){.km .layout{grid-template-columns:1fr}.km aside .stack{gap:12px}}@media(max-width:600px){.km{padding:18px}.km .panel{padding:18px}.km .fields,.km .options{grid-template-columns:1fr}.km .tabs{margin-left:-18px;margin-right:-18px;padding:0 18px}.km h1{font-size:28px}.km .device-icon{width:48px;height:48px;flex-basis:48px}.km .steps{gap:8px;font-size:12px}}
 `;
 const uiIcon = name => h("span", {className:"km-icon", "aria-hidden":true, dangerouslySetInnerHTML:{__html:icons[name] || ""}});
 const num = (n) =>
@@ -40,8 +45,7 @@ const field = (text, control, hint) =>
     hint && h("span", { className: "hint" }, hint),
   );
 // Same enclosure artwork as the Crew app listing; inherit the host palette.
-const deviceIconSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 96 96\" fill=\"none\" role=\"img\" aria-label=\"Kirometer ghost enclosure\"><g transform=\"translate(52 46)\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M0,-39 C20,-39 29,-34 29,-24 C29,-8 29,12 25,28 C23,34 20,41 16,41 C14,41 12,41 10,41 C6,41 3,36 1,33 C-3,36 -6,41 -10,41 C-12,41 -14,41 -16,41 C-25,41 -26,31 -24,25 C-31,29 -37,26 -37,21 C-37,15 -30,10 -29,-1 C-29,-14 -30,-27 -22,-34 C-16,-38 -7,-39 0,-39 Z\" fill=\"currentColor\" fill-opacity=\".20\" stroke=\"currentColor\" stroke-width=\"6.8\" stroke-opacity=\".85\"/><rect x=\"-22.2\" y=\"-24.2\" width=\"44.4\" height=\"44.4\" rx=\"6.2\" fill=\"var(--km-purple)\" fill-opacity=\".12\" stroke=\"currentColor\" stroke-opacity=\".7\" stroke-width=\"4.8\"/><path d=\"M-14 11H14\" stroke=\"var(--km-purple)\" stroke-opacity=\".28\" stroke-width=\"4.8\"/><path d=\"M-14 11H3\" stroke=\"var(--km-purple)\" stroke-width=\"4.8\"/></g></svg>";
-const deviceIcon = () => h("div", {className:"device-icon", "aria-hidden":true, dangerouslySetInnerHTML:{__html:deviceIconSvg}});
+const deviceIcon = () => h("div", {className:"device-icon app-icon", "aria-hidden":true, dangerouslySetInnerHTML:{__html:deviceIconSvg}});
 const statusPill = (online, text) =>
   h(
     "span",
@@ -143,35 +147,21 @@ function UsageSummary({ data, error }) {
     ),
   );
 }
-function AppSettings({api}) {
-  const [saved, setSaved] = useState(null), [interval, setIntervalValue] = useState(300),
-    [busy, setBusy] = useState(false), [message, setMessage] = useState("");
-  useEffect(()=>{
-    let active=true;
-    api.get("/api/apps/kirometer/settings").then(data=>{
-      if(active){setSaved(data.poll_seconds);setIntervalValue(data.poll_seconds);}
-    }).catch(()=>{if(active)setMessage("Could not load app settings. Reopen this page to retry.");});
-    return ()=>{active=false;};
-  },[api]);
-  const saveSettings=async()=>{
-    setBusy(true);setMessage("");
-    try {
-      const result=await api.post("/api/apps/kirometer/settings",{poll_seconds:interval});
-      if(result.error)throw Error(result.error);
-      setSaved(result.poll_seconds);setIntervalValue(result.poll_seconds);
-      setMessage("Saved. Usage refresh timing updated; activity stays fast.");
-    } catch(e){setMessage(e.message || "Settings could not be saved.");}
-    finally{setBusy(false);}
-  };
-  return h("details",{className:"panel gap"},
-    h("summary",null,"App settings"),
-    h("div",{className:"stack"},
-      field("Usage refresh interval (seconds)",h("input",{type:"number",min:5,max:3600,step:1,value:interval,disabled:saved===null || busy,onChange:e=>setIntervalValue(e.target.value===""?"":Number(e.target.value))}),"Default: 300 seconds (5 minutes). Applies to plan and overage credit reads. Range: 5–3,600 seconds."),
-      h("p",{className:"small muted"},"Activity checks every 250 ms and sends changes immediately. A 5-second keepalive maintains the device connection. Usage refresh timing does not slow activity or device controls."),
-      h("div",{className:"row"},button(busy?"Saving…":"Save app settings",saveSettings,busy || saved===null || saved===interval || !Number.isInteger(interval) || interval<5 || interval>3600,"primary")),
-      message && h("p",{className:"small muted",role:"status"},message)));
-}
+const pages = [
+  {id:"devices", label:"Devices", href:"#/devices"},
+  {id:"gallery", label:"Screen gallery", href:"#/gallery"},
+  {id:"create", label:"Create with Kiro", href:"#/create"},
+];
+const currentPage = () => pages.find(page => page.href === window.location.hash)?.id || "devices";
 export default function Kirometer() {
+  const [page, setPage] = useState(currentPage);
+  useEffect(() => {
+    const update = () => setPage(currentPage());
+    window.addEventListener("hashchange", update);
+    return () => window.removeEventListener("hashchange", update);
+  }, []);
+  const navigate = id => { window.location.hash = pages.find(page => page.id === id).href; };
+
   const api = sdk.useAppApi(),
     usage = usePolling(api, "/api/apps/kirometer/snapshot", 1000);
   return h(
@@ -187,6 +177,10 @@ export default function Kirometer() {
         h("h1", null, "Kirometer"),
         h("p", { className: "muted" }, "A little companion for your Kiro day."),
       ),
+      h("div", {className:"header-right"},
+      h("nav", {className:"page-nav", "aria-label":"Kirometer pages"},
+        ...pages.filter(item => item.id !== "create").map(item => h("a", {key:item.id, href:item.href, "aria-current":page === item.id ? "page" : undefined},
+          item.label, item.id === "create" && h("span", {className:"badge", style:{marginLeft:8}}, "Beta")))),
       statusPill(
         !usage.error && !!usage.data,
         usage.error
@@ -194,23 +188,21 @@ export default function Kirometer() {
           : usage.data
             ? "Connected to Crew"
             : "Connecting to Crew",
-      ),
+      )),
     ),
-    h(DeviceManager, { api, usage }),
-    h(AppSettings, { api }),
-    h(
-      "p",
-      { className: "footer" },
-      "Credits are cached separately from live activity. Usage comes from Crew’s billing cache, with the IDE cache as a fallback. Sync continues while this page is closed.",
-    ),
+    h(DeviceManager, { api, usage, page, navigate }),
   );
 }
-function DeviceManager({ api, usage }) {
+function DeviceManager({ api, usage, page, navigate }) {
   const polled = usePolling(api, "/api/apps/kirometer/devices", 2000);
-  const [info, setInfo] = useState(null),
+  const [rawInfo, setInfo] = useState(null),
+    [selectedId, setSelectedId] = useState(null),
     [view, setView] = useState("manage"),
-    [browseGallery, setBrowseGallery] = useState(false),
     [tab, setTab] = useState("info"),
+    [galleryTab, setGalleryTab] = useState("main"),
+    [creditScenario, setCreditScenario] = useState("normal"),
+    [previewActivity, setPreviewActivity] = useState("Ready"),
+    [previewPlaying, setPreviewPlaying] = useState(() => !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches),
     [flow, setFlow] = useState(null),
     [step, setStep] = useState(1);
   const [port, setPort] = useState(""),
@@ -237,7 +229,10 @@ function DeviceManager({ api, usage }) {
   useEffect(() => {
     if (polled.data) setInfo(polled.data);
   }, [polled.data]);
-  const d = info?.link?.status,
+  const configured = rawInfo?.devices || [];
+  const selected = configured.find(device => device.id === selectedId);
+  const info = rawInfo && {...rawInfo, link: selected?.link || (view === "setup" ? {connected:false,status:null} : rawInfo.link)};
+  const d = selected ? selected.link?.status || selected.last_status : info?.link?.status,
     linked = !!info?.link?.connected && !polled.error,
     running = !!busy || info?.job?.state === "running" || polled.error,
     controllable = linked && d?.controls_supported;
@@ -312,9 +307,10 @@ function DeviceManager({ api, usage }) {
     try {
       const result = await api.post(
         "/api/apps/kirometer/devices/" + name,
-        body,
+        {...(selectedId && ["controls", "disconnect"].includes(name) ? {configured_id:selectedId} : {}), ...body},
       );
       if (result.error) throw Error(result.error);
+      if (result.configured_id && name !== "retry") setSelectedId(result.configured_id);
       done?.(result);
       await refresh();
       return result;
@@ -382,7 +378,7 @@ function DeviceManager({ api, usage }) {
       setNotice("Connecting over USB. This also prepares Bluetooth pairing."),
     );
   const connectBLE = () =>
-    action("bluetooth_connect", { address }, () =>
+    action("bluetooth_connect", { address, name: nearby?.find(device => device.address === address)?.name }, () =>
       setNotice("Connecting over Bluetooth. Allow pairing if macOS prompts."),
     );
   const bluetooth = () =>
@@ -478,7 +474,7 @@ function DeviceManager({ api, usage }) {
       h(
         "p",
         { className: "small muted" },
-        "One Kirometer can sync at a time. Connecting another device replaces the current connection.",
+        "Each configured Kirometer syncs independently. Unavailable devices remain in your device grid.",
       ),
     );
   const historyTarget = () => {
@@ -634,14 +630,39 @@ function DeviceManager({ api, usage }) {
       updateLog(),
     );
   const galleryBrowser = () => h("section", {className:"panel stack", "aria-label":"Screen gallery"},
-    h("div", {className:"row spread"}, h("h2",null,"Screen gallery"), button("Close gallery",()=>setBrowseGallery(false))),
-    h("p", {className:"small muted"},"Explore all six faces. Swipe left or right on your Kirometer to switch between them. Connect a device to choose its startup default."),
-    h("div", {className:"layout-gallery"}, ...screenLayouts.map(layout => h("article",{key:layout.id,className:"screen-card"},
-      h("img",{src:layout.preview,alt:layout.title+" screen preview",width:480,height:480}),
-      h("h3",null,layout.title),h("p",null,layout.description),
-      linked && h("span",{className:"choice-state"}, (d?.screen_layouts_version || 1) < (layout.capabilityVersion || 1) ? "Requires firmware "+layout.minimumFirmware : d?.screen_layout===layout.id ? "Current face" : "Available")))),
-    linked && button("Customize default face",()=>{setBrowseGallery(false);setView("manage");setTab("screen");},running),
-    h("p",{className:"gallery-note"},"Previews use sample data. All six faces are included in firmware 0.6.0. Extra-credit meters compare overage with the plan allowance."));
+    h("div",{className:"row spread"},
+      h("h2",null,"Screen gallery"),
+      h("button",{type:"button",onClick:()=>navigate("create")},"Create with Kiro",h("span",{className:"badge",style:{marginLeft:8}},"Beta"))),
+    h("p", {className:"small muted"},"Explore the three parts of your Kirometer display. Choose defaults and sleep settings separately for each device."),
+    h("nav", {className:"tabs",role:"tablist","aria-label":"Screen types",style:{marginTop:0,marginBottom:0}},
+      ...[["main","Main screen"],["detail","Detail screen"],["idle","Idle screen"]].map(([id,label])=>h("button",{
+        key:id,type:"button",id:"gallery-tab-"+id,role:"tab","aria-selected":galleryTab===id,"aria-controls":"gallery-panel-"+id,
+        tabIndex:galleryTab===id?0:-1,onClick:()=>setGalleryTab(id),onKeyDown:event=>{
+          const ids=["main","detail","idle"];let next;
+          if(event.key==="ArrowRight")next=ids[(ids.indexOf(id)+1)%3];
+          if(event.key==="ArrowLeft")next=ids[(ids.indexOf(id)+2)%3];
+          if(event.key==="Home")next=ids[0];if(event.key==="End")next=ids[2];
+          if(next){event.preventDefault();setGalleryTab(next);document.getElementById("gallery-tab-"+next)?.focus();}
+        }},label))),
+    h("div",{role:"tabpanel",id:"gallery-panel-"+galleryTab,"aria-labelledby":"gallery-tab-"+galleryTab,className:"stack"},
+      galleryTab !== "detail" && h("div",{className:"row"},
+        button(previewPlaying ? "Pause animation" : "Play animation",()=>setPreviewPlaying(!previewPlaying)),
+        galleryTab === "main" && field("Preview activity",h("select",{value:previewActivity,onChange:event=>setPreviewActivity(event.target.value)},
+          ...[["Ready","Ready"],["Working","Working"],["Needs attention","Needs response"],["Complete","Complete"],["Error","Error"]].map(([value,label])=>h("option",{key:value,value},label)))),
+        h("p",{className:"small muted"},galleryTab === "idle" ? "Device timing: a 5.5-second peek every 20 seconds, alternating edges." : "Firmware ghost sprites and motion at 20 frames per second.")),
+      galleryTab === "main" ? h(React.Fragment,null,
+        h("div",{className:"row"},field("Sample credit usage",h("select",{value:creditScenario,onChange:event=>setCreditScenario(event.target.value)},
+          h("option",{value:"none"},"No usage · 0 / 1,000"),h("option",{value:"normal"},"Normal usage · 126 / 1,000"),h("option",{value:"overage"},"Overage · 1,250 / 1,000"))),
+          h("p",{className:"small muted"},creditScenario==="overage" ? "125% used · 250 overage credits" : creditScenario==="none" ? "0% used · 1,000 credits remaining" : "12.6% used · 874 credits remaining")),
+        h("p",{className:"small muted"},"Six main faces. Swipe left or right on your device to switch between them. Choose a startup default under Devices → Default screen."),
+        h("div", {className:"layout-gallery"}, ...screenLayouts.map(layout => h("article",{key:layout.id,className:"screen-card",style:{cursor:"default"}},
+          h(AnimatedPreview,{id:layout.id,src:layout.scenarios?.[creditScenario] || layout.preview,title:layout.title,activity:previewActivity,playing:previewPlaying,active:page==="gallery"}),
+          h("h3",null,layout.title),h("p",null,layout.description)))),
+        h("p",{className:"gallery-note"},"Preview selections do not change your device or real usage. Extra-credit meters compare overage with the plan allowance."))
+      : h("article",{className:"screen-card",style:{maxWidth:360,cursor:"default"}},
+          galleryTab === "idle" ? h(AnimatedPreview,{id:"idle",title:"Peeking ghost",playing:previewPlaying,active:page==="gallery"}) : h("img",{src:galleryScreens[galleryTab].preview,alt:galleryScreens[galleryTab].title+" preview",width:480,height:480}),
+          h("h3",null,galleryScreens[galleryTab].title),h("p",null,galleryScreens[galleryTab].description),
+          h("p",{className:"gallery-note"},galleryTab==="detail" ? "Sample session data. Shared by every main face." : "Animated screensaver preview. Shared by every main face."))));
   const updateLog = () => {
     const updates = targetUpdates();
     const target = historyTarget();
@@ -810,7 +831,7 @@ function DeviceManager({ api, usage }) {
     const activeUSB = info?.link?.transport === "usb" ? info.link.port : null;
     const usbDetails = info?.port_details || [];
     return h("div", {className:"stack"},
-      h("div", null, h("h3", null, "About your Kirometer"), h("p", {className:"small muted"}, "Live device details and capabilities reported by the firmware. USB information comes from this computer.")),
+      h("div", null, h("h3", null, "About your Kirometer"), h("p", {className:"small muted"}, linked ? "Live device details and capabilities reported by the firmware. USB information comes from this computer." : "Last saved identity. Connect this device to see its live status and capabilities.")),
       h("div", {className:"info-grid"},
         section("Device", [
           ["Name", d?.device_name],
@@ -926,6 +947,9 @@ function DeviceManager({ api, usage }) {
       ),
     );
   const start = (type) => {
+    setSelectedId(null);
+    setDirty(false);
+    setPending(null);
     setView("setup");
     setFlow(type);
     setStep(1);
@@ -1145,9 +1169,48 @@ function DeviceManager({ api, usage }) {
           ),
         ),
     );
+  const retryDevice = device => action("retry", {configured_id:device.id});
+  const firmwareUpdate = (device, installed) => newerFirmware(installed, info?.bundled_firmware_version)
+    ? h("button", {type:"button", className:"firmware-update", disabled:!!busy || !!pending || dirty,
+        onClick:()=>{if(device)setSelectedId(device.id);setView("manage");setTab("firmware");navigate("devices");
+          requestAnimationFrame(()=>document.getElementById("km-tab-firmware")?.scrollIntoView({block:"center",behavior:"smooth"}));}},
+        "↑ Firmware " + info.bundled_firmware_version + " available · Update")
+    : null;
+  const cards = () => configured.length > 0 && h("div", {className:"configured-grid", "aria-label":"Configured Kirometers"},
+    ...configured.map(device => {
+      const link = device.link || {};
+      const online = !!link.connected && !polled.error;
+      const seconds = link.retry_in_seconds;
+      const next = typeof seconds === "number" ? seconds >= 60 ? `${Math.ceil(seconds / 60)} min` : `${seconds}s` : null;
+      return h("section", {key:device.id, className:"panel configured-card" + (selectedId === device.id ? " selected" : ""), "aria-label":device.name || "Kirometer"},
+        h("div", {className:"device-head"}, deviceIcon(), h("div", null,
+          h("h3", null, device.name || "Kirometer"),
+          statusPill(online, polled.error ? "Status unavailable" : online ? `${link.transport === "bluetooth" ? "Bluetooth" : "USB"} connected` : link.connecting ? "Connecting…" : "Unavailable"))),
+        h("p", {className:"small muted retry-note"}, polled.error ? "Crew is unavailable. Showing the last known device." : online ? "Usage and activity are syncing." : link.connecting ? "Looking for this Kirometer…" : next ? `Next automatic retry in ${next}. You can retry now.` : link.message === "Disconnected" ? "Automatic reconnect is paused." : link.message || "Power on your Kirometer and keep it nearby."),
+        h("dl", null, h("div", null, h("dt", null, "Firmware"), h("dd", null, link.status?.version || device.last_status?.version || "Not yet confirmed")),
+          h("div", null, h("dt", null, "Last seen"), h("dd", null, device.last_seen ? new Date(device.last_seen * 1000).toLocaleString() : "Not yet connected"))),
+        firmwareUpdate(device, link.status?.version || device.last_status?.version),
+        h("div", {className:"row"},
+          !online && button(link.connecting ? "Connecting…" : "Retry now", () => retryDevice(device), running || !!link.connecting, "primary"),
+          button(selectedId === device.id ? "Close details" : online ? "Manage device" : "View details", () => {setSelectedId(selectedId === device.id ? null : device.id);setPending(null);setDirty(false);setError("");setNotice("");setView("manage");}, !!busy || !!pending),
+          !online && link.reconnecting && button("Pause retries", () => action("disconnect", {configured_id:device.id}), running, "quiet")));
+    }),
+    h("section", {key:"add-device", className:"panel configured-card add-device-card", "aria-label":"Add another Kirometer"},
+      h("button", {type:"button", className:"choice", disabled:!!running, onClick:()=>start("existing")},
+        h("strong", null, uiIcon("lucide-bluetooth"), "Discover existing"),
+        h("span", null, "Connect a Kirometer that already has firmware.")),
+      h("button", {type:"button", className:"choice", disabled:!!running, onClick:()=>start("new")},
+        h("strong", null, uiIcon("lucide-usb"), "Add new device"),
+        h("span", null, "Set up and flash a new Kirometer over USB-C."))));
   return h(
     "div",
     { className: "gap stack" },
+    h("div", {hidden:page !== "gallery"}, galleryBrowser()),
+    h("div", {hidden:page !== "create"},
+    h(CustomFaces,{api,devices:configured,onApply:async(id,face)=>{const result=await action("controls",{configured_id:id,custom_face:face,screen_layout:"custom"});if(result){setSelectedId(id);setPending({seq:result.control_seq,values:{screen_layout:"custom",custom_face_name:face.name}});}return result;}}),
+      page === "create" && notice && h("p", {className:"notice", role:"status"}, notice),
+      page === "create" && error && h("p", {className:"notice error", role:"alert"}, error)),
+    h("div", {className:"stack", hidden:page !== "devices"},
     h(
       "div",
       { className: "row spread" },
@@ -1158,22 +1221,10 @@ function DeviceManager({ api, usage }) {
         h(
           "span",
           { className: "badge" },
-          linked ? "1 connected" : "None connected",
+          configured.length ? `${configured.filter(device => device.link?.connected && !polled.error).length} of ${configured.length} connected` : linked ? "1 connected" : "None connected",
         ),
       ),
-      h("div",{className:"row"}, button("Browse screen gallery",()=>setBrowseGallery(v=>!v)), button(
-        "Add a device",
-        () => {
-          setView("setup");
-          setFlow(null);
-          setError("");
-          setNotice("");
-        },
-        running || view === "setup",
-        "primary",
-      )),
     ),
-    browseGallery && galleryBrowser(),
     polled.error &&
       h(
         "p",
@@ -1201,7 +1252,14 @@ function DeviceManager({ api, usage }) {
     h(
       "div",
       { className: "layout" },
-      !info
+      h("div", {className:"usage-column"}, h(UsageSummary, usage),
+        h(
+      "p",
+      { className: "footer" },
+      "Usage refreshes automatically and is cached separately from live activity. Usage comes from Crew’s billing cache, with the IDE cache as a fallback. Sync continues while this page is closed.",
+    )),
+      h("div", {className:"stack"}, view !== "setup" && cards(),
+      configured.length > 0 && !selected && view !== "setup" ? null : !info
         ? h(
             "section",
             { className: "panel loading" },
@@ -1217,7 +1275,7 @@ function DeviceManager({ api, usage }) {
             )
           : view === "setup"
             ? setup()
-            : linked
+            : (selected || linked)
               ? h(
                   "section",
                   { className: "panel" },
@@ -1238,18 +1296,18 @@ function DeviceManager({ api, usage }) {
                           "Waveshare · 2.16″ AMOLED",
                         ),
                         statusPill(
-                          true,
-                          (info?.link.transport === "bluetooth"
-                            ? "Bluetooth"
-                            : "USB") + " connected",
+                          linked,
+                          linked ? (info?.link.transport === "bluetooth" ? "Bluetooth" : "USB") + " connected" : "Unavailable",
                         ),
                       ),
                     ),
+                    h("div", {className:"row", style:{marginLeft:"auto",justifyContent:"flex-end"}},
+                    firmwareUpdate(selected, d?.version),
                     button(
                       d?.sleeping ? "Wake display" : "Preview screensaver",
                       quickSleep,
                       running || !controllable || dirty || !!pending,
-                    ),
+                    )),
                   ),
                   h(
                     "nav",
@@ -1338,7 +1396,9 @@ function DeviceManager({ api, usage }) {
                   h(
                     "h2",
                     null,
-                    info?.link?.reconnecting
+                    selected
+                      ? selected.name
+                      : info?.link?.reconnecting
                       ? "Reconnecting to your Kirometer"
                       : info?.link?.port
                       ? info?.link?.message === "Connecting…"
@@ -1356,7 +1416,7 @@ function DeviceManager({ api, usage }) {
                   h(
                     "div",
                     { className: "row" },
-                    button(
+                    selected ? button("Retry now", () => retryDevice(selected), running || !!selected.link?.connecting, "primary") : button(
                       "Connect existing device",
                       () => start("existing"),
                       running,
@@ -1373,7 +1433,8 @@ function DeviceManager({ api, usage }) {
                       "quiet",
                     ),
                 ),
-      h(UsageSummary, usage),
+      ),
+    ),
     ),
   );
 }

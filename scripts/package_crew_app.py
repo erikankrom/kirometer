@@ -11,9 +11,9 @@ def package_files():
     source=ROOT/'crew-app'
     app=json.loads((source/'app.json').read_text())
     manifest=json.loads((source/'firmware/firmware.json').read_text())
-    files={Path('app.json'),Path('README.md'),Path('CHANGELOG.md'),Path('ui/index.mjs'),Path('ui/layouts.mjs'),Path('ui/icons.mjs'),Path('vendor/checksums.json'),Path('firmware/firmware.json')}
+    files={Path('app.json'),Path('README.md'),Path('CHANGELOG.md'),Path('ui/index.mjs'),Path('ui/custom-faces.mjs'),Path('ui/layouts.mjs'),Path('ui/gallery-screens.mjs'),Path('ui/animated-preview.mjs'),Path('ui/animation-assets.mjs'),Path('ui/icons.mjs'),Path('vendor/checksums.json'),Path('firmware/firmware.json')}
     files.update(p.relative_to(source) for p in (source/'backend').glob('*.py'))
-    files.add(Path('ui/firmware-history.mjs'))
+    files.update((Path('ui/firmware-history.mjs'),Path('ui/app-icon.mjs'),Path('ui/art/icon-crew.svg')))
     files.update(p.relative_to(source) for p in (source/'ui/art/icons').iterdir() if p.is_file())
     for key in ('iconPath','iconPathDark','heroImage','heroImageDark','heroImageDetail','heroImageDetailDark'):
         files.add(Path(app[key]))

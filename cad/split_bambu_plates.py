@@ -1,7 +1,8 @@
 """Arrange the existing Bambu project on coupon, white-body, and purple-accent plates."""
 from pathlib import Path
-import copy,json,zipfile,xml.etree.ElementTree as E
-src=Path('exports/kirometer-bambu.3mf')
+import copy,json,zipfile,sys,xml.etree.ElementTree as E
+src=Path(sys.argv[1]) if len(sys.argv)>1 else Path('exports/kirometer-bambu.3mf')
+dst=Path(sys.argv[2]) if len(sys.argv)>2 else Path('/tmp/kirometer-three-plates.3mf')
 ns='http://schemas.microsoft.com/3dmanufacturing/core/2015/02'
 E.register_namespace('',ns);E.register_namespace('p','http://schemas.microsoft.com/3dmanufacturing/production/2015/06');E.register_namespace('BambuStudio','http://schemas.bambulab.com/package/2021')
 with zipfile.ZipFile(src) as z:
@@ -42,6 +43,6 @@ with zipfile.ZipFile(src) as z:
  cfg['flush_volumes_matrix']=['0','140','140','0']
  cfg['flush_volumes_vector']=['140','140','140','140']
  data={'Metadata/project_settings.config':json.dumps(cfg,indent=2).encode(),'Metadata/model_settings.config':E.tostring(settings,encoding='utf-8',xml_declaration=True),'3D/3dmodel.model':E.tostring(model,encoding='utf-8',xml_declaration=True),'Metadata/filament_sequence.json':json.dumps({f'plate_{i}':{'nozzle_sequence':[],'optimal_assignment':[],'sequence':[]} for i in range(1,4)}).encode()}
- with zipfile.ZipFile('/tmp/kirometer-three-plates.3mf','w',zipfile.ZIP_DEFLATED) as out:
+ with zipfile.ZipFile(dst,'w',zipfile.ZIP_DEFLATED) as out:
   for info in z.infolist():out.writestr(info,data.get(info.filename,z.read(info.filename)))
 print('Prepared three plates with white/purple PLA assignments')

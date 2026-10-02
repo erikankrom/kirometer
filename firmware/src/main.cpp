@@ -19,8 +19,10 @@
 #include "smooth_text.h"
 #include "face_navigation.h"
 #include "lucide_icons.h"
+#include "session_activity.h"
+#include "custom_face.h"
 
-static constexpr char VERSION[] = "0.6.0";
+static constexpr char VERSION[] = "0.9.0";
 static constexpr uint16_t BG=0x0000, SPRITE_BG=0x20E4, PURPLE=0x923F, RED=0xFB2F, WHITE=0xFFFF, MUTED=0xAD55, GREEN=0x6EF3;
 Arduino_DataBus *bus = new Arduino_ESP32QSPI(12,38,4,5,6,7);
 Arduino_CO5300 *panel = new Arduino_CO5300(bus,39,0,480,480,0,0,0,0);
@@ -31,11 +33,15 @@ TouchDrvCST92xx touch;bool touchOK=false;volatile bool touchPending=false;uint32
 void IRAM_ATTR touchInterrupt(){touchPending=true;}
 bool pmuOK=false, available=false, stale=true, details=false;
 float used=0, limit=0, overage=0;
+SessionActivity sessionStats;
 unsigned long lastUsage=0, lastPaint=0, lastButton=0;
 char input[4096]; size_t count=0; bool overflow=false;
 String activity="Unknown", reset="Unknown", plan="KIRO";
 unsigned long stateSince=0;
 Preferences preferences;
+JsonDocument customFace;
+uint32_t customRevision=0;
+bool hasCustomFace(){return !customFace.isNull();}
 String pairingToken,deviceName,sleepMode="auto",screenLayout="ghost",defaultScreenLayout="ghost";
 int brightness=180,sleepAfter=120;
 bool sleeping=false;
@@ -129,12 +135,16 @@ String statusJson() {
     doc["uptime_seconds"]=millis()/1000;doc["bluetooth_connected"]=bleConnected;doc["device_name"]=deviceName;doc["bluetooth_supported"]=true;doc["paired"]=pairingToken.length()>0;
     doc["touch_supported"]=touchOK;doc["touch_events"]=touchEvents;doc["last_wake"]=lastWake;
     doc["default_screen_layout"]=defaultScreenLayout;doc["screen_layouts_version"]=2;doc["swipe_events"]=swipeEvents;doc["screen_layouts_supported"]=true;doc["screen_layout"]=screenLayout;
+    doc["custom_faces_supported"]=true;doc["custom_faces_version"]=1;doc["custom_face_name"]=hasCustomFace()?customFace["name"].as<String>():"";doc["custom_face_revision"]=customRevision;
     doc["controls_supported"]=true;doc["brightness"]=brightness;doc["sleep_mode"]=sleepMode;doc["sleeping"]=sleeping;doc["sleep_after"]=sleepAfter;doc["control_seq"]=controlSeq;
     doc["usage_connected"]=lastUsage && millis()-lastUsage<30000;
     doc["activity"]=activity;doc["usage_available"]=available; doc["usage_stale"]=stale;
     doc["displayed_seq"]=displayedSeq;doc["display_usage_available"]=displayAvailable;
     if(displayAvailable){doc["display_usage_used"]=displayUsed;doc["display_usage_limit"]=displayLimit;doc["display_usage_overage"]=displayOverage;}
     else{doc["display_usage_used"]=nullptr;doc["display_usage_limit"]=nullptr;doc["display_usage_overage"]=nullptr;}
+    doc["session_activity_supported"]=true;doc["session_activity_available"]=sessionStats.available;
+    doc["session_activity_stale"]=sessionStats.stale;doc["detail_screen"]=details?"session_activity":"closed";
+    if(sessionStats.available){doc["sessions_today"]=sessionStats.today;doc["session_messages_today"]=sessionStats.messages;doc["session_tools_today"]=sessionStats.tools;}
     doc["charging"]=powerCharging;
     if(powerBattery) doc["battery_percent"]=powerPercent;
     else doc["battery_percent"]=nullptr;
@@ -153,10 +163,20 @@ void handle(const char *line) {
     if(type!="kirometer.usage") return;
     JsonVariant controls=doc["controls"];
     uint32_t cs=controls["seq"] | 0;
-    if(cs && cs!=controlSeq){
+    bool acceptControls=cs && cs!=controlSeq;
+    if(acceptControls && !controls["custom_face"].isNull()){
+        acceptControls=validateCustomFace(controls["custom_face"]);
+        if(acceptControls){
+            String encoded;serializeJson(controls["custom_face"],encoded);
+            acceptControls=preferences.putString("custom_face",encoded)==encoded.length();
+            if(acceptControls){customFace.set(controls["custom_face"]);customRevision++;}
+        }
+    }
+    // Invalid custom content never interrupts normal usage or activity delivery.
+    if(acceptControls){
         if(controls["brightness"].is<int>()){brightness=constrain(controls["brightness"].as<int>(),5,255);panel->setBrightness(brightness);preferences.putInt("brightness",brightness);}
         String layout=controls["screen_layout"] | "";
-        if(validLayout(layout.c_str())){
+        if(validLayout(layout.c_str()) || (layout=="custom" && hasCustomFace())){
             screenLayout=defaultScreenLayout=layout;preferences.putString("screen_layout",layout);details=false;lastInteraction=millis();
         }
         String mode=controls["sleep_mode"] | "";
@@ -171,6 +191,16 @@ void handle(const char *line) {
         for(size_t i=0;i<name.length();i++)if((uint8_t)name[i]<32 || name[i]==127)validName=false;
         if(validName){deviceName=name;preferences.putString("device_name",name);advertiseName();}
         controlSeq=cs;
+    }
+    JsonVariant stats=doc["session_activity"];
+    sessionStats=SessionActivity{};
+    JsonVariant counts[]={stats["today"]["sessions"],stats["today"]["messages"],stats["today"]["tool_calls"],stats["this_week"]["sessions"],stats["this_month"]["sessions"]};
+    bool statsValid=stats["available"].as<bool>();
+    for(auto v:counts)if(!v.is<int32_t>() || v.as<int32_t>()<0)statsValid=false;
+    if(statsValid){
+        sessionStats.available=true;sessionStats.stale=stats["stale"].isNull() || stats["stale"].as<bool>();
+        sessionStats.incomplete=stats["incomplete"].as<bool>();
+        sessionStats.today=counts[0];sessionStats.messages=counts[1];sessionStats.tools=counts[2];sessionStats.week=counts[3];sessionStats.month=counts[4];
     }
     JsonVariant c=doc["credits"][0];
     bool valid=c["used"].is<float>() && c["limit"].is<float>();
@@ -250,6 +280,9 @@ void paintAnimation(){
             else if(edge==2)peekingGhost(178,480-reveal,0);
             else peekingGhost(178,-GHOST_H+reveal,2);
         }
+    }else if(!details && screenLayout=="custom"){
+        // Beta custom faces are static, redrawn only when bound data changes.
+        return;
     }else if(!details && faceIndex(screenLayout.c_str())>=0){
         compactFaceGhost();
     }else if(!details && screenLayout=="usage"){
@@ -272,6 +305,8 @@ void draw() {
     // Cache only visible state. Sequence acknowledgments still advance for unchanged usage.
     bool hint=!sleeping && !details && int32_t(faceHintUntil-frameNow)>0;
     String key=sleeping?"sleep":String(details)+"|"+hint+"|"+screenLayout+"|"+linked+"|"+bleConnected+"|"+powerBattery+"|"+powerUSB+"|"+powerCharging+"|"+powerPercent+"|"+activity+"|"+plan+"|"+reset+"|"+available+"|"+stale+"|"+String(used,4)+"|"+String(limit,4)+"|"+String(overage,4);
+    if(screenLayout=="custom")key+="|"+String(customRevision)+"|"+String(sessionStats.available)+"|"+sessionStats.today+"|"+sessionStats.messages+"|"+sessionStats.tools;
+    if(details && !sleeping)key+="|"+String(sessionStats.available)+"|"+sessionStats.stale+"|"+sessionStats.incomplete+"|"+sessionStats.today+"|"+sessionStats.messages+"|"+sessionStats.tools+"|"+sessionStats.week+"|"+sessionStats.month;
     static String paintedKey;
     static bool oldPeekVisible=false;
     static unsigned oldEdge=0;
@@ -285,7 +320,7 @@ void draw() {
     }else if(frameNow-lastPaint>=FRAME_INTERVAL_MS){
         bool visible=sleeping && frameNow%20000<5500;
         unsigned edge=(frameNow/20000)%4;
-        if(!sleeping && !details){
+        if(!sleeping && !details && screenLayout!="custom"){
             Rect r=faceRegion(screenLayout.c_str());
             gfx->fillRect(r.x,r.y,r.w,r.h,BG);
             paintAnimation();flushRegion(r);
@@ -442,13 +477,83 @@ void paintFace(bool linked){
     faceFooter(linked);
 }
 void paintFaceHint(){
+    if(screenLayout=="custom"){gfx->fillRect(0,428,480,52,BG);centered(438,customFace["name"].as<String>(),1,0xC51F);return;}
     int index=allFaceIndex(screenLayout.c_str());if(index<0)return;
     gfx->fillRect(0,428,480,52,BG);centered(430,ALL_FACE_NAMES[index],1,0xC51F);
     for(int i=0;i<6;i++)gfx->fillCircle(195+i*18,465,i==index?4:3,i==index?PURPLE:0x632D);
 }
 
+
+// Shared by every face's detail view. All content stays on a pure black canvas.
+void paintSessionDetails() {
+    label(20,60,"Session activity",3);
+    if(!sessionStats.available){
+        centered(162,"No session data yet",3);
+        centered(220,"Connect to Kiro Crew",2,MUTED);
+        centered(252,"to sync local activity",2,MUTED);
+    }else{
+        label(20,111,"Sessions today",2,0xBB5F);
+        fittedLabel(20,140,String(sessionStats.today),440,6,WHITE);
+        fittedLabel(20,239,String(sessionStats.messages),210,3,WHITE);
+        fittedLabel(254,239,String(sessionStats.tools),206,3,WHITE);
+        label(20,278,"Messages",2,MUTED);label(254,278,"Tool calls",2,MUTED);
+        gfx->drawFastHLine(20,321,440,0x39A7);
+        label(20,334,"This week",2,MUTED);label(254,334,"This month",2,MUTED);
+        fittedLabel(20,365,String(sessionStats.week),210,4,WHITE);
+        fittedLabel(254,365,String(sessionStats.month),206,4,WHITE);
+        centered(417,sessionStats.stale?"Last reading - stale":sessionStats.incomplete?"Local CLI - partial data":"Local CLI sessions",1,MUTED);
+    }
+    gfx->fillRoundRect(190,458,100,5,2,MUTED);
+}
+
+uint16_t customColor(const char* c){
+    if(!strcmp(c,"purple"))return PURPLE;if(!strcmp(c,"green"))return GREEN;if(!strcmp(c,"red"))return RED;
+    if(!strcmp(c,"muted"))return MUTED;if(!strcmp(c,"panel"))return 0x20E5;return WHITE;
+}
+String customValue(const char* key){
+    if(!strcmp(key,"plan"))return plan;if(!strcmp(key,"reset"))return reset;if(!strcmp(key,"activity"))return activity;
+    if(!strcmp(key,"battery"))return powerBattery?String(powerPercent)+"%":powerUSB?"USB":"--";
+    if(!strcmp(key,"sessions"))return sessionStats.available?String(sessionStats.today):"--";
+    if(!strcmp(key,"messages"))return sessionStats.available?String(sessionStats.messages):"--";
+    if(!strcmp(key,"tools"))return sessionStats.available?String(sessionStats.tools):"--";
+    if(!available)return "--";
+    if(!strcmp(key,"used"))return number(used);if(!strcmp(key,"limit"))return number(limit);
+    if(!strcmp(key,"remaining"))return number(max(0.0f,limit-used));if(!strcmp(key,"overage"))return number(overage);
+    return limit>0?number(min(999999.0f,used/limit*100))+"%":"--";
+}
+void customText(int x,int y,int w,int h,const String& text,int size,uint16_t color){
+    const auto& font=screenFont(size);int pen=x,baseline=y+font.baseline;const char* p=text.c_str();
+    while(*p){const auto& g=font.glyphs[nextGlyph(p)];
+        for(int row=0;row<g.height;row++)for(int col=0;col<g.width;col++){
+            int px=pen+g.left+col,py=baseline+g.top+row;
+            if(px<x||py<y||px>=x+w||py>=y+h)continue;
+            unsigned index=row*g.width+col,packed=font.pixels[g.offset+index/2];unsigned a=(index&1)?packed&15:packed>>4;
+            if(a){auto& pixel=gfx->getFramebuffer()[py*480+px];pixel=blend565(color,pixel,a);}
+        }pen+=g.advance;
+    }
+}
+void paintCustomFace(bool linked){
+    for(JsonObject e:customFace["elements"].as<JsonArray>()){
+        int x=e["x"],y=e["y"],w=e["w"],h=e["h"],size=e["size"];const char* kind=e["kind"];uint16_t color=customColor(e["color"]);
+        if(!strcmp(kind,"panel"))gfx->fillRoundRect(x,y,w,h,min(12,min(w,h)/2),color);
+        else if(!strcmp(kind,"bar")){
+            gfx->fillRect(x,y,w,h,0x39A7);int fill=available && limit>0?int(min(1.0f,max(0.0f,used/limit))*w):0;
+            if(fill)gfx->fillRect(x,y,fill,h,color);
+        }else if(!strcmp(kind,"ghost")){
+            int gw=min(w,h*123/150),gh=gw*150/123;
+            for(int yy=0;yy<gh;yy++)for(int xx=0;xx<gw;xx++){
+                auto pixel=GHOST_SOUTH[(yy*150/gh)*123+xx*123/gw];
+                if(pixel!=BG)gfx->drawPixel(x+(w-gw)/2+xx,y+(h-gh)/2+yy,pixel);
+            }
+        }else customText(x,y,w,h,!strcmp(kind,"metric")?customValue(e["value"]):e["value"].as<String>(),size,color);
+    }
+    paintDeviceIndicators();gfx->fillCircle(24,24,5,linked?GREEN:RED);label(38,13,linked?"Connected":"Disconnected",1);
+    label(20,444,stale?"Usage stale":"Live activity",1,MUTED);rightLabel(460,444,"Custom / Beta",1,MUTED);
+}
+
 void paintStatic(bool linked) {
     gfx->fillScreen(BG);
+    if(!details && screenLayout=="custom" && hasCustomFace()){paintCustomFace(linked);return;}
     if(!details && faceIndex(screenLayout.c_str())>=0){paintFace(linked);return;}
     paintDeviceIndicators();
     if(!details && screenLayout=="usage"){paintUsageDashboard(linked);return;}
@@ -475,22 +580,7 @@ void paintStatic(bool linked) {
         if(available && overage>0)rightLabel(450,438,"+"+number(overage)+" overage",1,RED);
         else if(stale)rightLabel(450,438,"Stale",1,MUTED);
     }else{
-        label(18,60,"Usage details",4);
-        label(18,108,plan,2,0xC51F);
-        const int ys[]={142,192,242,292,342};
-        const char* names[]={"Used","Allowance","Left","Overage","Resets"};
-        String values[]={available?number(used):"--",available?number(limit):"--",available?number(max(0.0f,limit-used)):"--",available?number(overage):"--",reset.substring(0,10)};
-        for(int i=0;i<5;i++){
-            label(18,ys[i]+10,names[i],2,MUTED);
-            int valueSize=i==4?3:4;
-            // Preserve a readable gap if a large account total needs a smaller font.
-            while(valueSize>2 && textBounds(values[i].c_str(),valueSize).w>286)valueSize--;
-            rightLabel(462,ys[i],values[i],valueSize,i==3?RED:WHITE);
-            gfx->drawFastHLine(18,ys[i]+43,444,0x39A7);
-        }
-        label(18,392,stale?"Usage cache stale":"Usage cache fresh",2,MUTED);
-        gfx->drawRoundRect(18,425,444,42,9,PURPLE);
-        centered(436,faceIndex(screenLayout.c_str())>=0?"Back to face":screenLayout=="usage"?"Back to usage":"Back to ghost",2);
+        paintSessionDetails();
     }
 }
 
@@ -504,8 +594,10 @@ void setup(){
     // Waveshare's 2.16-inch example uses MADCTL 0xA0 for this panel.
     bus->writeC8D8(0x36,0xA0);
     preferences.begin("kirometer",false);
+    String savedFace=preferences.getString("custom_face","");
+    if(savedFace.length()>2000 || deserializeJson(customFace,savedFace) || !validateCustomFace(customFace.as<JsonVariantConst>()))customFace.clear();
     screenLayout=preferences.getString("screen_layout","ghost");
-    if(!validLayout(screenLayout.c_str()))screenLayout="ghost";
+    if(!validLayout(screenLayout.c_str()) && !(screenLayout=="custom" && hasCustomFace()))screenLayout="ghost";
     defaultScreenLayout=screenLayout;
     brightness=constrain(preferences.getInt("brightness",180),5,255);
     sleepMode=preferences.getString("sleep_mode","auto");sleepAfter=preferences.getInt("sleep_after",120);
@@ -552,10 +644,10 @@ void loop(){
         else if(touchDown){
             auto action=gesture.end(millis());int x=gesture.x(),y=gesture.y();
             if(action==Gesture::Next || action==Gesture::Previous){
-                details=false;screenLayout=nextFace(screenLayout.c_str(),action==Gesture::Next?1:-1);swipeEvents++;faceHintUntil=millis()+1300;
+                details=false;screenLayout=nextFaceWithCustom(screenLayout.c_str(),action==Gesture::Next?1:-1,hasCustomFace());swipeEvents++;faceHintUntil=millis()+1300;
                 lastInteraction=millis();draw();
             }else if(action==Gesture::Tap && x>=18 && x<=462){
-                bool usageTarget=faceIndex(screenLayout.c_str())>=0?(y>=75 && y<=427):screenLayout=="usage"?(y>=136 && y<=434):(y>=354 && y<=461);
+                bool usageTarget=screenLayout=="custom"?(y>=354 && y<=424):faceIndex(screenLayout.c_str())>=0?(y>=75 && y<=427):screenLayout=="usage"?(y>=136 && y<=434):(y>=354 && y<=461);
                 if(!details && usageTarget){details=true;draw();}
                 else if(details && y>=425){details=false;draw();}
             }

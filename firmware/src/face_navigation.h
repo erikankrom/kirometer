@@ -11,6 +11,12 @@ inline constexpr const char* ALL_FACE_NAMES[]={"Ghost companion","Usage dashboar
 inline int allFaceIndex(const char* id){for(int i=0;i<6;i++)if(!strcmp(id,ALL_FACE_IDS[i]))return i;return -1;}
 inline bool validLayout(const char* id){return faceIndex(id)>=0 || !strcmp(id,"ghost") || !strcmp(id,"usage");}
 inline const char* nextFace(const char* id,int direction){int i=allFaceIndex(id);return ALL_FACE_IDS[i<0?0:(i+direction+6)%6];}
+inline const char* nextFaceWithCustom(const char* id,int direction,bool customAvailable){
+ if(!customAvailable)return nextFace(id,direction);
+ if(!strcmp(id,"custom"))return direction>0?"ghost":"big_number";
+ if((!strcmp(id,"big_number")&&direction>0)||(!strcmp(id,"ghost")&&direction<0))return "custom";
+ return nextFace(id,direction);
+}
 inline Rect faceRegion(const char* id){
  switch(faceIndex(id)){case 0:return {187,95,108,126};case 1:return {295,113,130,155};case 2:return {316,88,108,130};case 3:return {350,263,84,94};}
  return !strcmp(id,"usage")?MINI_REGION:HERO_REGION;

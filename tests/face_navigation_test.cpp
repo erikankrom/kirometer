@@ -3,6 +3,12 @@
 #include "../firmware/src/face_navigation.h"
 #include "../firmware/src/smooth_text.h"
 int main(){
+ assert(!strcmp(nextFaceWithCustom("big_number",1,true),"custom"));
+ assert(!strcmp(nextFaceWithCustom("custom",1,true),"ghost"));
+ assert(!strcmp(nextFaceWithCustom("ghost",-1,true),"custom"));
+ assert(!strcmp(nextFaceWithCustom("custom",-1,true),"big_number"));
+ assert(!strcmp(nextFaceWithCustom("big_number",1,false),"ghost"));
+
  assert(!strcmp(nextFace("orbit",-1),"usage"));
  assert(!strcmp(nextFace("big_number",1),"ghost"));
  assert(!strcmp(nextFace("usage",1),"orbit"));

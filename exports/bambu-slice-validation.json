@@ -1,0 +1,182 @@
+{
+    "error_string": "Success.",
+    "export_time": 553,
+    "layer_height": 0.20000000298023224,
+    "plate_index": 0,
+    "prepare_time": 18,
+    "return_code": 0,
+    "sliced_plates": [
+        {
+            "feature_type_times": {
+                "Bottom surface": 32.421390533447266,
+                "Bridge": 6.233598232269287,
+                "Custom": 361.1839904785156,
+                "Flush": 29.0,
+                "Gap infill": 35.05259704589844,
+                "Inner wall": 250.2141571044922,
+                "Internal solid infill": 61.985313415527344,
+                "Outer wall": 116.88207244873047,
+                "Sparse infill": 26.705787658691406,
+                "Top surface": 59.35258102416992,
+                "Travel": 105.47793579101563,
+                "Undefined": 90.11466217041016
+            },
+            "filament_change_times": 0,
+            "filaments": [
+                {
+                    "filament_id": "GFA00",
+                    "id": 1,
+                    "main_used_g": 8.448869705200195,
+                    "total_used_g": 8.448869705200195
+                }
+            ],
+            "generate_support_material_time": 25,
+            "id": 1,
+            "infill_time": 132,
+            "layer_filament_change": 0,
+            "main_predication": 665.359375,
+            "make_perimeters_time": 85,
+            "obj_cached_cnt": 0,
+            "objects": [
+                {
+                    "bbox": {
+                        "depth": 54.0,
+                        "height": 8.0,
+                        "width": 64.0,
+                        "x": 101.0,
+                        "y": 105.0,
+                        "z": 0.0
+                    },
+                    "id": 9,
+                    "name": "kirometer-fit-coupon.stl",
+                    "triangle_count": 1948
+                }
+            ],
+            "sliced_time": 489,
+            "sliced_time_with_cache": 207,
+            "total_predication": 1069.1495361328125,
+            "triangle_count": 1948,
+            "warning_message": ""
+        },
+        {
+            "feature_type_times": {
+                "Bottom surface": 80.91490936279297,
+                "Bridge": 71.12042999267578,
+                "Custom": 361.17852783203125,
+                "Flush": 29.0,
+                "Gap infill": 172.3588409423828,
+                "Inner wall": 1238.10595703125,
+                "Internal solid infill": 239.60171508789063,
+                "Outer wall": 664.2027587890625,
+                "Sparse infill": 259.2149963378906,
+                "Top surface": 130.77700805664063,
+                "Travel": 797.824951171875,
+                "Undefined": 782.3560180664063
+            },
+            "filament_change_times": 0,
+            "filaments": [
+                {
+                    "filament_id": "GFA00",
+                    "id": 1,
+                    "main_used_g": 33.289825439453125,
+                    "total_used_g": 33.289825439453125
+                }
+            ],
+            "generate_support_material_time": 54,
+            "id": 2,
+            "infill_time": 125,
+            "layer_filament_change": 0,
+            "main_predication": 3624.94287109375,
+            "make_perimeters_time": 277,
+            "obj_cached_cnt": 0,
+            "objects": [
+                {
+                    "bbox": {
+                        "depth": 79.68504333496094,
+                        "height": 29.899999618530273,
+                        "width": 65.9921875,
+                        "x": 406.2000427246094,
+                        "y": 87.31363677978516,
+                        "z": -9.265136213798542e-09
+                    },
+                    "id": 5,
+                    "name": "kirometer-ghost-body.stl",
+                    "triangle_count": 7126
+                }
+            ],
+            "sliced_time": 1242,
+            "sliced_time_with_cache": 724,
+            "total_predication": 4028.621826171875,
+            "triangle_count": 7126,
+            "warning_message": ""
+        },
+        {
+            "feature_type_times": {
+                "Bottom surface": 87.45338439941406,
+                "Bridge": 126.59178924560547,
+                "Custom": 360.8894958496094,
+                "Flush": 29.0,
+                "Gap infill": 13.280847549438477,
+                "Inner wall": 110.81742858886719,
+                "Internal solid infill": 197.57749938964844,
+                "Outer wall": 71.65827941894531,
+                "Sparse infill": 40.165645599365234,
+                "Top surface": 77.4140625,
+                "Travel": 91.56330871582031,
+                "Undefined": 76.46853637695313
+            },
+            "filament_change_times": 0,
+            "filaments": [
+                {
+                    "filament_id": "GFA00",
+                    "id": 2,
+                    "main_used_g": 8.858926773071289,
+                    "total_used_g": 8.858926773071289
+                }
+            ],
+            "generate_support_material_time": 16,
+            "id": 3,
+            "infill_time": 58,
+            "layer_filament_change": 0,
+            "main_predication": 787.5668334960938,
+            "make_perimeters_time": 67,
+            "obj_cached_cnt": 0,
+            "objects": [
+                {
+                    "bbox": {
+                        "depth": 70.3114242553711,
+                        "height": 7.400007247924805,
+                        "width": 65.99219512939453,
+                        "x": 99.00003814697266,
+                        "y": -184.19366455078125,
+                        "z": -2.143171741408878e-06
+                    },
+                    "id": 13,
+                    "name": "kirometer-rear-cover.stl",
+                    "triangle_count": 2446
+                }
+            ],
+            "sliced_time": 302,
+            "sliced_time_with_cache": 151,
+            "total_predication": 1191.3309326171875,
+            "triangle_count": 2446,
+            "warning_message": ""
+        }
+    ],
+    "sparse_infill_density": 20.0,
+    "upward_compatible_machine": [
+        "Bambu Lab P1P 0.4 nozzle",
+        "Bambu Lab X1 0.4 nozzle",
+        "Bambu Lab X1 Carbon 0.4 nozzle",
+        "Bambu Lab X1E 0.4 nozzle",
+        "Bambu Lab A1 0.4 nozzle",
+        "Bambu Lab H2D 0.4 nozzle",
+        "Bambu Lab H2D Pro 0.4 nozzle",
+        "Bambu Lab H2S 0.4 nozzle",
+        "Bambu Lab P2S 0.4 nozzle",
+        "Bambu Lab H2C 0.4 nozzle",
+        "Bambu Lab X2D 0.4 nozzle",
+        "Bambu Lab A2L 0.4 nozzle"
+    ],
+    "wall_loops": 4
+}

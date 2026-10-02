@@ -1,0 +1,49 @@
+{
+  "revision": "v9",
+  "producer": "Bambu Studio 02.08.02.61",
+  "printer": "P1S",
+  "nozzle_mm": 0.4,
+  "filament_colors": [
+    "#FFFFFF",
+    "#9147FF"
+  ],
+  "supports": "0",
+  "physically_print_tested": false,
+  "stored_mesh_triangle_counts": [
+    1948,
+    2446,
+    7126
+  ],
+  "plates": [
+    {
+      "name": "01 Fit coupon \u2014 white",
+      "objects": [
+        "kirometer-fit-coupon.stl"
+      ],
+      "filament_slot": 1,
+      "estimated_seconds": 1069.1,
+      "estimated_grams": 8.45,
+      "slice_warnings": ""
+    },
+    {
+      "name": "02 Body \u2014 white",
+      "objects": [
+        "kirometer-ghost-body.stl"
+      ],
+      "filament_slot": 1,
+      "estimated_seconds": 4028.6,
+      "estimated_grams": 33.29,
+      "slice_warnings": ""
+    },
+    {
+      "name": "03 Accents \u2014 purple",
+      "objects": [
+        "kirometer-rear-cover.stl"
+      ],
+      "filament_slot": 2,
+      "estimated_seconds": 1191.3,
+      "estimated_grams": 8.86,
+      "slice_warnings": ""
+    }
+  ]
+}

@@ -17,3 +17,46 @@ exports/*.zip
 /.aws/
 /.codex/
 /.agents/
+
+# Editor, Python test, and build caches
+.idea/
+.vscode/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+*.swp
+*.swo
+*~
+*.blend[0-9]
+
+# Generated release archives and unpacked copies (keep printable STL/3MF files)
+/exports/*-print-package/
+/exports/makerworld-covers/
+/exports/makerworld-photos/
+/exports/screen-gallery.png
+
+# Superseded firmware; the current manifest's 0.9.0 images remain included.
+# Future versions are included automatically. Extend this range after a release.
+/crew-app/firmware/kirometer-0.[0-8].*.bin
+
+# Local reference images and UI verification captures
+/ChatGPT Image *.png
+/kiro-icon-reference.png
+/previews/*-installed.png
+/previews/*-verified.png
+/previews/add-device-card-installed.png
+/previews/ai-face-beta.png
+/previews/app-page-navigation.png
+/previews/crew-full-width.png
+/previews/default-screen-tab.png
+/previews/device-card-only-add.png
+/previews/device-firmware-history.png
+/previews/device-info.png
+/previews/firmware-update-indicator.png
+/previews/gallery-disconnected.png
+/previews/lucide-icon-preview.png
+/previews/polling-settings.png

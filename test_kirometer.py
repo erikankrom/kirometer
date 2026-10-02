@@ -8,7 +8,7 @@ from kirometer import normalize, read_usage
 
 class UsageTests(unittest.TestCase):
     def test_expired_snapshot_remains_stale(self):
-        result = normalize({'timestamp': 1000, 'usageBreakdowns': [{'type': 'CREDIT', 'currentUsage': 12.5, 'usageLimit': 50}]}, now=1000)
+        result = normalize({'timestamp': 1000, 'usageBreakdowns': [{'type': 'CREDIT', 'currentUsage': 12.5, 'usageLimit': 50}]}, now=4000)
         self.assertTrue(result['stale'])
         self.assertEqual(result['credits'][0]['remaining_plan_credits'], 37.5)
         self.assertEqual(result['activity'], 'unknown')

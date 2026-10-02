@@ -1,0 +1,17 @@
+{
+  "kirometer-fit-coupon.stl": {
+    "triangles": 1948,
+    "non_manifold_edges": 0,
+    "volume_mm3": 7451.04
+  },
+  "kirometer-ghost-body.stl": {
+    "triangles": 7126,
+    "non_manifold_edges": 0,
+    "volume_mm3": 32392.56
+  },
+  "kirometer-rear-cover.stl": {
+    "triangles": 2446,
+    "non_manifold_edges": 0,
+    "volume_mm3": 8793.44
+  }
+}

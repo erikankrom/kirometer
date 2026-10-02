@@ -8,8 +8,9 @@ import json
 from pathlib import Path
 import sqlite3
 
-from .usage import default_db, read_usage
+from .usage import DEFAULT_STALE_AFTER, default_db, read_usage
 from .activity import ActivityTracker
+from . import session_activity
 
 _task = None
 _snapshot = None
@@ -19,10 +20,12 @@ _activity_tracker = ActivityTracker()
 ACTIVITY_INTERVAL = .25
 KEEPALIVE_SECONDS = 5
 _usage_collected_mono = None
-_settings = {'poll_seconds': 300, 'stale_after': 300}
+_settings = {'poll_seconds': 300, 'stale_after': DEFAULT_STALE_AFTER}
 _usage_reschedule = None
 _update_event = None
 _revision = 0
+_session_task = None
+_session_stats = None
 
 
 def notify_update():
@@ -57,6 +60,7 @@ def current_snapshot(now=None):
         data['stale'] = bool(data.get('stale')) or data['age_seconds'] > _settings['stale_after']
     data.update(usage_poll_seconds=_settings['poll_seconds'], activity_poll_ms=250,
                 next_usage_poll_seconds=max(0, round(_settings['poll_seconds'] - elapsed)))
+    data['session_activity'] = dict(_session_stats or {'available': False, 'stale': True})
     return data
 
 
@@ -119,7 +123,7 @@ def bounded_integer(value, default, low, high):
     return value if isinstance(value, int) and not isinstance(value, bool) and low <= value <= high else default
 
 
-def crew_usage(now=None):
+def crew_usage(now=None, stale_after=DEFAULT_STALE_AFTER):
     """Version-bound cache adapter; never invokes refresh or reads auth stores."""
     try:
         from kiro_crew.dashboard.handlers.usage import get_usage_cache
@@ -128,10 +132,10 @@ def crew_usage(now=None):
         stamp=getattr(sessions,'_usage_cache_ts',0)
     except (ImportError,AttributeError,TypeError):
         return None
-    return normalize_crew(cache,stamp,now)
+    return normalize_crew(cache,stamp,now,stale_after)
 
 
-def normalize_crew(cache,stamp,now=None):
+def normalize_crew(cache,stamp,now=None,stale_after=DEFAULT_STALE_AFTER):
     import time
     now=time.time() if now is None else now
     used,limit=cache.get('credits_used'),cache.get('credits_plan')
@@ -140,7 +144,8 @@ def normalize_crew(cache,stamp,now=None):
     age=max(0,now-stamp) if isinstance(stamp,(int,float)) and math.isfinite(stamp) and stamp>0 else None
     return {'source':'kiro_crew_billing_cache','available':True,'observed_at':None,
             'age_seconds':round(age) if age is not None else None,
-            'stale':bool(cache.get('stale')) or age is None or age>300,
+            # Crew's explicit stale flag means a failed/retained reading, not age.
+            'stale':bool(cache.get('stale')) or age is None or age>stale_after,
             'credits':[{'used':used,'limit':limit,'remaining_plan_credits':max(0,limit-used),
                         'used_percent':used/limit*100 if limit>0 else None,'reset_at':cache.get('resets'),
                         'overage_used':max(0,used-limit)}],
@@ -149,10 +154,10 @@ def normalize_crew(cache,stamp,now=None):
 
 
 def collect(config):
-    stale_after = bounded_integer(config.get('stale_after'), 300, 0, 86400)
+    stale_after = bounded_integer(config.get('stale_after'), DEFAULT_STALE_AFTER, 0, 86400)
     path = config.get('db_path') or default_db()
     try:
-        result = crew_usage() if not config.get('db_path') else None
+        result = crew_usage(stale_after=stale_after) if not config.get('db_path') else None
         if result is None:
             result = read_usage(Path(path), stale_after)
         result['available'] = bool(result['credits'])
@@ -192,22 +197,51 @@ async def poll(ctx):
         notify_update()
 
 
+async def refresh_sessions():
+    global _session_stats
+    stats = await session_activity.read()
+    if not stats['available'] and _session_stats and _session_stats.get('available'):
+        stats = dict(_session_stats, stale=True)
+    if stats != _session_stats:
+        _session_stats = stats
+        notify_update()
+
+
+async def poll_sessions():
+    while True:
+        await refresh_sessions()
+        await asyncio.sleep(session_activity.POLL_SECONDS)
+
+
 async def on_startup(ctx):
     global _task, _snapshot, _activity_task, _usage_collected_mono, _settings, _usage_reschedule, _update_event
+    global _session_task
     await on_shutdown(ctx)
     config = await asyncio.to_thread(read_settings, ctx)
     ctx.config.update(config)
     _settings = {'poll_seconds': bounded_integer(config.get('poll_seconds'), 300, 5, 3600),
-                 'stale_after': bounded_integer(config.get('stale_after'), 300, 0, 86400)}
+                 'stale_after': bounded_integer(config.get('stale_after'), DEFAULT_STALE_AFTER, 0, 86400)}
     _usage_reschedule = asyncio.Event()
     _update_event = asyncio.Event()
     _snapshot = await asyncio.to_thread(collect, ctx.config)
     _usage_collected_mono = time.monotonic()
     _task = asyncio.create_task(poll(ctx), name='kirometer-collector')
     _activity_task = asyncio.create_task(poll_activity(), name='kirometer-activity')
+    _session_task = asyncio.create_task(poll_sessions(), name='kirometer-session-activity')
+    from .devices import restore_devices
+    await restore_devices(ctx)
 
 
 async def on_shutdown(ctx):
+    from .custom_faces import stop as stop_faces
+    await stop_faces()
+    global _session_task, _session_stats
+    if _session_task:
+        _session_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await _session_task
+    _session_task = None
+    _session_stats = None
     global _task, _snapshot, _activity_task, _activity_state, _activity_tracker
     if _activity_task:
         _activity_task.cancel()
@@ -240,7 +274,8 @@ async def health(request, ctx):
 def register_routes(ctx):
     from kiro_crew.apps.route_registry import AppRoute
     from .devices import route
-    return [AppRoute('GET', '/snapshot', snapshot), AppRoute('GET', '/health', health),
+    from .custom_faces import route as faces_route
+    return [AppRoute('GET', '/faces', faces_route), *[AppRoute('POST', '/faces/'+action, faces_route) for action in ('generate','save','delete')], AppRoute('GET', '/snapshot', snapshot), AppRoute('GET', '/health', health),
             AppRoute('GET', '/devices', route),
             AppRoute('GET', '/settings', settings), AppRoute('POST', '/settings', settings),
-            *[AppRoute('POST', '/devices/' + action, route) for action in ('setup','bundle','flash','status','connect','disconnect','controls','setup_bluetooth','bluetooth_scan','bluetooth_connect')]]
+            *[AppRoute('POST', '/devices/' + action, route) for action in ('setup','bundle','flash','status','connect','disconnect','controls','setup_bluetooth','bluetooth_scan','bluetooth_connect','retry')]]

@@ -11,6 +11,8 @@
 #include "ghost_motion.h"
 #include "usage_layout.h"
 #include "lucide_icons.h"
+#include "session_activity.h"
+SessionActivity sessionStats;
 using std::min;using std::max;
 constexpr float PI=3.14159265358979323846f;
 template<typename T>T constrain(T x,T lo,T hi){return min(hi,max(lo,x));}

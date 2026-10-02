@@ -19,18 +19,149 @@ _history = []
 _history_path = None
 _task = None
 _lock = asyncio.Lock()
-_link_task = None
-_pending_controls = None
 _control_seq = secrets.randbits(31)
-_link = {"connected": False, "port": None, "status": None, "message": "No device linked"}
+_sessions = {}
+_registry_path = None
+
+class DeviceSession:
+    def __init__(self, record):
+        self.record = record
+        self.task = None
+        self.pending_controls = None
+        self.retry_deadline = None
+        self.link = {'connected': False, 'port': record.get('port'),
+                     'transport': record.get('transport'), 'status': None,
+                     'message': 'Unavailable', 'connecting': False}
+
+    def public(self):
+        link = dict(self.link)
+        if self.retry_deadline is not None:
+            link['retry_in_seconds'] = max(0, int(self.retry_deadline - time.monotonic() + .999))
+        return {**self.record, 'link': link}
+
+
+def load_devices(ctx):
+    global _registry_path, _sessions
+    path = Path(ctx.data_dir) / 'configured-devices.json'
+    if _registry_path == path:
+        return
+    _registry_path = path
+    try:
+        records = json.loads(path.read_text())
+        if not isinstance(records, list): raise ValueError('Invalid device registry')
+    except FileNotFoundError:
+        records = []
+    _sessions = {r['id']: DeviceSession(r) for r in records
+                 if isinstance(r, dict) and isinstance(r.get('id'), str)
+                 and r.get('transport') in ('bluetooth', 'usb')}
+
+
+def persist_devices():
+    if _registry_path is None: return
+    _registry_path.parent.mkdir(parents=True, exist_ok=True)
+    temp = _registry_path.with_suffix('.tmp')
+    temp.write_text(json.dumps([s.record for s in _sessions.values()]))
+    temp.chmod(0o600)
+    temp.replace(_registry_path)
+
+
+def select_device(payload):
+    key = payload.get('configured_id')
+    if key:
+        if key not in _sessions: raise ValueError('Choose a configured device.')
+        return _sessions[key]
+    if len(_sessions) == 1: return next(iter(_sessions.values()))
+    raise ValueError('Choose a device for this action.')
+
+
+def backoff_seconds(failures):
+    return min(300, 5 * 2 ** min(max(failures, 0), 6))
+
+
+async def stop_session(session, pause=False):
+    task = session.task
+    if task and not task.done():
+        task.cancel()
+        try: await task
+        except asyncio.CancelledError: pass
+    session.task = None
+    session.pending_controls = None
+    session.retry_deadline = None
+    session.link = {**session.link, 'connected': False, 'connecting': False,
+                    'reconnecting': False, 'status': None, 'message': 'Disconnected',
+                    'retry_in_seconds': None}
+    if pause:
+        session.record['auto_connect'] = False
+        persist_devices()
+
+
+async def connect_device(ctx, port, transport, name=None):
+    load_devices(ctx)
+    session = next((s for s in _sessions.values()
+                    if s.record.get('endpoints', {}).get(transport) == port), None)
+    # USB chip identity lets us switch a known device away from BLE before opening USB.
+    if transport == 'usb':
+        inventory = await port_inventory(ctx, [port])
+        identity = next((usb_identity(i).get('device_id') for i in inventory if i['device'] == port), None)
+        if identity:
+            if session and session.record.get('device_id') not in (None, identity):
+                session.record.get('endpoints', {}).pop('usb', None)
+                session = None
+            session = next((s for s in _sessions.values() if s.record.get('device_id') == identity), session)
+    if session is None:
+        record = {'id': uuid.uuid4().hex, 'name': str(name or 'Kirometer')[:80], 'endpoints': {}}
+        session = DeviceSession(record)
+        _sessions[record['id']] = session
+    await stop_session(session)
+    session.record.update(port=port, transport=transport, auto_connect=True)
+    session.record['endpoints'][transport] = port
+    persist_devices()
+    session.link = {'connected': False, 'connecting': True, 'port': port,
+                    'transport': transport, 'status': None, 'message': 'Connecting…'}
+    session.task = asyncio.create_task(bridge(ctx, port, transport, session))
+    return session
+
+
+async def remember_status(session, status):
+    # Store only durable identity/display settings, never pairing tokens or telemetry.
+    device_id = status.get('device_id')
+    if device_id:
+        for key, other in list(_sessions.items()):
+            if other is not session and other.record.get('device_id') == device_id:
+                await stop_session(other)
+                session.record['endpoints'] = {**other.record.get('endpoints', {}), **session.record['endpoints']}
+                del _sessions[key]
+    values = {k: status[k] for k in ('device_id', 'device_name', 'version', 'default_screen_layout') if k in status}
+    changed = values != session.record.get('last_status')
+    first_seen = not session.record.get('last_seen')
+    session.record.update(last_status=values, last_seen=time.time())
+    if device_id: session.record['device_id'] = device_id
+    if status.get('device_name'): session.record['name'] = status['device_name']
+    if changed or first_seen: persist_devices()
+
+
+async def restore_devices(ctx):
+    if not getattr(ctx, 'data_dir', None): return
+    load_devices(ctx)
+    if sys.platform != 'darwin': return
+    for session in list(_sessions.values()):
+        r = session.record
+        if r.get('auto_connect') and ((r['transport'] == 'bluetooth' and bluetooth_ready(ctx)) or
+                (r['transport'] == 'usb' and tools_ready(ctx) and r['port'] in ports())):
+            session.link.update(connecting=True, message='Connecting…')
+            session.task = asyncio.create_task(bridge(ctx, r['port'], r['transport'], session))
 _inventory_cache = None
 _inventory_lock = asyncio.Lock()
 
 
 def validate_controls(payload):
     out={}
+    if 'custom_face' in payload:
+        from .custom_faces import validate
+        out['custom_face']=validate(payload['custom_face'])
+        out['screen_layout']='custom'
     if 'screen_layout' in payload:
-        if payload['screen_layout'] not in ('ghost','usage','orbit','sidekick','ticket','big_number'):raise ValueError('Choose an available screen layout.')
+        if payload['screen_layout'] not in ('ghost','usage','orbit','sidekick','ticket','big_number','custom'):raise ValueError('Choose an available screen layout.')
         out['screen_layout']=payload['screen_layout']
     if 'brightness' in payload:
         n=payload['brightness']
@@ -319,12 +450,18 @@ async def start(kind,ctx,port=None,bundle=None):
             inventory = await port_inventory(ctx, [port], force=True)
             target = next((item for item in inventory if item['device'] == port), {})
             identity = usb_identity(target)
+            target_session = next((s for s in _sessions.values() if s.record.get('device_id') == identity.get('device_id') and identity.get('device_id')), None)
+            _link = target_session.link if target_session else {}
             status = _link.get('status') or {}
             if identity.get('device_id') and identity['device_id'] == status.get('device_id'):
                 identity['name'] = status.get('device_name')
             elif _link.get('connected') and _link.get('transport') == 'usb' and _link.get('port') == port and not identity.get('device_id'):
                 identity.update(device_id=status.get('device_id'), name=status.get('device_name'), source='usb_status')
-        await disconnect()
+        # Only pause the device being flashed; other meters keep syncing.
+        if kind == 'flash':
+            for session in list(_sessions.values()):
+                if session.record.get('endpoints', {}).get('usb') == port or (identity.get('device_id') and session.record.get('device_id') == identity['device_id']):
+                    await stop_session(session, pause=True)
         _job = {'id':uuid.uuid4().hex,'kind':kind,'state':'running','port':port,'started_at':time.time(),'message':'Setting up tools…' if kind in ('setup','setup_bluetooth') else 'Flashing firmware…'}
         if kind == 'flash':
             _job.update(version=bundle['version'], device=identity, console='Preparing firmware update…\n')
@@ -345,33 +482,47 @@ async def stop():
             pass
 
 
+def bundled_firmware_version():
+    try:
+        manifest = json.loads((Path(__file__).resolve().parents[1] / 'firmware/firmware.json').read_text())
+        return manifest.get('version') if manifest.get('board') == BOARD else None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 async def route(request,ctx):
     from aiohttp import web
-    global _link_task
     # Bind activity telemetry on any device request, even without opening the usage page.
     from .runtime import bind_activity_state
     bind_activity_state(request.app.get('state'))
+    load_devices(ctx)
     action = request.path.rsplit('/',1)[-1]
     try:
         if request.method == 'GET':
             load_history(ctx)
             current_ports = ports()
             inventory = await port_inventory(ctx, current_ports)
-            return web.json_response({'supported':sys.platform=='darwin','ports':current_ports,'port_details':inventory,'tools_ready':tools_ready(ctx),'bluetooth_ready':bluetooth_ready(ctx),'default_name':default_name(),'job':_job,'firmware_updates':_history,'link':_link,'bundled_firmware':str(Path(__file__).resolve().parents[1] / 'firmware/firmware.json')},headers={'Cache-Control':'no-store'})
+            return web.json_response({'supported':sys.platform=='darwin','ports':current_ports,'port_details':inventory,'tools_ready':tools_ready(ctx),'bluetooth_ready':bluetooth_ready(ctx),'default_name':default_name(),'job':_job,'firmware_updates':_history,'devices':[s.public() for s in _sessions.values()],'link':next((s.link for s in _sessions.values() if s.link.get('connected')), {'connected':False,'status':None}),'bundled_firmware_version':bundled_firmware_version(),'bundled_firmware':str(Path(__file__).resolve().parents[1] / 'firmware/firmware.json')},headers={'Cache-Control':'no-store'})
         payload = await request.json()
         if not isinstance(payload,dict):
             raise ValueError('Device request must be a JSON object.')
         if action in ('setup','setup_bluetooth'):
             return web.json_response(await start(action,ctx),status=202)
         if action == 'disconnect':
-            await disconnect()
-            return web.json_response(_link)
+            async with _lock:
+                session = select_device(payload)
+                await stop_session(session, pause=True)
+            return web.json_response(session.public())
         if action == 'controls':
-            global _pending_controls, _control_seq
+            global _control_seq
+            session = select_device(payload)
+            _link = session.link
             if not _link.get('connected'):raise ValueError('Connect a device before changing settings.')
             if not (_link.get('status') or {}).get('controls_supported'):raise ValueError('Flash Kirometer 0.5.3 to enable device controls.')
             controls=validate_controls(payload)
-            _control_seq+=1;controls['seq']=_control_seq;_pending_controls=controls
+            if (controls.get('screen_layout')=='custom' or 'custom_face' in controls) and not (_link.get('status') or {}).get('custom_faces_supported'):
+                raise ValueError('Update this device to firmware 0.9.0 for custom faces (Beta).')
+            _control_seq+=1;controls['seq']=_control_seq;session.pending_controls=controls
             from .runtime import notify_update
             notify_update()
             return web.json_response({'queued':True,'control_seq':_control_seq},status=202)
@@ -388,9 +539,10 @@ async def route(request,ctx):
             try:address=str(uuid.UUID(address))
             except (ValueError,TypeError,AttributeError):raise ValueError('Select a discovered Bluetooth device.')
             if not (Path(ctx.data_dir)/'bluetooth-pairing.json').exists():raise ValueError('Connect over USB once to provision Bluetooth pairing.')
-            await disconnect()
-            _link_task=asyncio.create_task(bridge(ctx,address,transport='bluetooth'))
-            return web.json_response({'connecting':True},status=202)
+            async with _lock:
+                if _task and not _task.done(): raise ValueError('Wait for the device operation to finish.')
+                session = await connect_device(ctx,address,'bluetooth',payload.get('name'))
+            return web.json_response({'connecting':True,'configured_id':session.record['id']},status=202)
         if action == 'connect':
             async with _lock:
                 if _task and not _task.done():
@@ -398,9 +550,21 @@ async def route(request,ctx):
                 if not tools_ready(ctx):
                     raise ValueError('Set up device tools first.')
                 port = check_port(payload.get('port'))
-                await disconnect()
-                _link_task = asyncio.create_task(bridge(ctx,port))
-                return web.json_response({'connecting':True},status=202)
+                session = await connect_device(ctx,port,'usb')
+                return web.json_response({'connecting':True,'configured_id':session.record['id']},status=202)
+        if action == 'retry':
+            async with _lock:
+                if _task and not _task.done(): raise ValueError('Wait for the device operation to finish.')
+                session = select_device(payload)
+                if session.link.get('connected') or session.link.get('connecting'):
+                    return web.json_response({'connecting': bool(session.link.get('connecting')), 'configured_id':session.record['id']})
+                r = session.record
+                if r['transport'] == 'usb':
+                    if not tools_ready(ctx): raise ValueError('Set up device tools first.')
+                    check_port(r['port'])
+                elif not bluetooth_ready(ctx): raise ValueError('Set up Bluetooth tools first.')
+                session = await connect_device(ctx,r['port'],r['transport'])
+                return web.json_response({'connecting':True,'configured_id':session.record['id']},status=202)
         if action == 'bundle':
             return web.json_response(await asyncio.to_thread(validate_bundle,payload.get('path','')))
         if action == 'flash':
@@ -411,9 +575,9 @@ async def route(request,ctx):
             return web.json_response(await start('flash',ctx,port,bundle),status=202)
         if action == 'status':
             async with _lock:
-                if _link_task and not _link_task.done():
-                    if payload.get('port') != _link.get('port'):
-                        raise ValueError('Disconnect the current USB link before checking another device.')
+                session = next((s for s in _sessions.values() if s.link.get('transport') == 'usb' and s.link.get('port') == payload.get('port') and s.task and not s.task.done()), None)
+                if session:
+                    _link = session.link
                     return web.json_response({'connected':_link['connected'],'firmware':'kirometer' if _link['status'] else 'unknown',**(_link['status'] or {}),'message':_link['message']})
                 if _task and not _task.done():
                     raise ValueError('Wait for the device operation to finish.')
@@ -432,36 +596,33 @@ async def route(request,ctx):
 
 
 async def disconnect():
-    global _link_task, _link
-    if _link_task and not _link_task.done():
-        _link_task.cancel()
-        try:
-            await _link_task
-        except asyncio.CancelledError:
-            pass
-    _link_task=None
-    _link={'connected':False,'port':None,'status':None,'message':'No device linked'}
+    for session in list(_sessions.values()):
+        await stop_session(session)
+    persist_devices()
 
 
-async def bridge(ctx,port,transport='usb'):
-    """Keep the user-selected BLE link alive until explicitly disconnected."""
-    global _link
-    failures=0
+async def bridge(ctx, port, transport, session):
+    """Independent retry schedule; stable delivery resets exponential backoff."""
+    failures = 0
     while True:
-        retry,delivered=await bridge_once(ctx,port,transport)
-        if transport!='bluetooth' or not retry:return
-        if delivered:failures=0
-        delay=min(30,5*2**min(failures,3));failures+=1
-        _link={'connected':False,'port':port,'status':None,'transport':transport,
-               'reconnecting':True,'retry_in_seconds':delay,'retry_attempt':failures,
-               'message':f'Bluetooth connection interrupted. Retrying automatically in {delay} seconds. Keep your Kirometer powered on and nearby.'}
+        session.retry_deadline = None
+        started = time.monotonic()
+        retry, delivered = await bridge_once(ctx, port, transport, session)
+        if transport != 'bluetooth' or not retry: return
+        # Avoid an endlessly aggressive retry loop on flapping connections.
+        if delivered and time.monotonic() - started >= 30: failures = 0
+        delay = backoff_seconds(failures)
+        failures += 1
+        session.retry_deadline = time.monotonic() + delay
+        session.link.update(connected=False, connecting=False, status=None,
+                            reconnecting=True, retry_in_seconds=delay, retry_attempt=failures,
+                            message='Unavailable. Automatic reconnect is scheduled.')
         await asyncio.sleep(delay)
 
 
-async def bridge_once(ctx,port,transport='usb'):
-    global _link, _pending_controls
+async def bridge_once(ctx,port,transport,session):
     proc=None;delivered=False;retry=True
-    _link={'connected':False,'port':port,'status':None,'transport':transport,'message':'Connecting…'}
+    session.link={'connected':False,'port':port,'status':None,'transport':transport,'message':'Connecting…','connecting':True}
     try:
         proc=await asyncio.create_subprocess_exec(str(python(ctx)),str(Path(__file__).with_name('bluetooth_bridge.py' if transport=='bluetooth' else 'serial_bridge.py')),*([] if transport=='bluetooth' else [port]),stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.DEVNULL,limit=8192)
         if transport=='bluetooth':
@@ -473,16 +634,16 @@ async def bridge_once(ctx,port,transport='usb'):
             seq+=1
             snapshot=runtime.current_snapshot()
             # Project only the usage contract; exclude cache paths and unrelated content.
-            payload={k:snapshot.get(k) for k in ('available','stale','credits','activity','plan')}
+            payload={k:snapshot.get(k) for k in ('available','stale','credits','activity','plan','session_activity')}
             payload.update(type='kirometer.usage',protocol=1,seq=seq)
-            controls=_pending_controls
-            if transport=='usb' and not provisioned and (_link.get('status') or {}).get('bluetooth_supported'):
+            controls=session.pending_controls
+            if transport=='usb' and not provisioned and (session.link.get('status') or {}).get('bluetooth_supported'):
                 _control_seq_local=secrets.randbits(31) or 1
                 controls={**(controls or {}),'seq':(controls or {}).get('seq',_control_seq_local),'pairing_token':pairing(ctx)['token']}
-                if not (_link.get('status') or {}).get('device_name') and 'device_name' not in controls:controls['device_name']=default_name()
+                if not (session.link.get('status') or {}).get('device_name') and 'device_name' not in controls:controls['device_name']=default_name()
             if controls:payload['controls']=controls
             sent_at=time.monotonic()
-            proc.stdin.write((json.dumps(payload,allow_nan=False)+'\n').encode())
+            proc.stdin.write((json.dumps(payload,allow_nan=False,separators=(',',':'))+'\n').encode())
             await proc.stdin.drain()
             raw=await asyncio.wait_for(proc.stdout.readline(),90 if seq==1 and transport=='bluetooth' else 10)
             if not raw:raise ValueError('USB connection closed.')
@@ -490,18 +651,23 @@ async def bridge_once(ctx,port,transport='usb'):
             if answer.get('error_code')=='bond_removed':raise ValueError('Pairing changed. Forget only this Kirometer in macOS Bluetooth settings, then scan and reconnect.')
             connected=answer.get('acknowledged') is True and isinstance(answer.get('status'),dict)
             if not connected:raise ValueError('Device did not acknowledge usage.')
+            expected = session.record.get('device_id')
+            if expected and answer['status'].get('device_id') != expected:
+                raise ValueError('Device identity changed. Use Add a device to connect this Kirometer.')
             delivered=True
-            _link={'connected':connected,'port':port,'status':answer.get('status') if connected else None,'last_ack_at':time.time() if connected else None,'delivery_ms':round((time.monotonic()-sent_at)*1000),'transport':transport,'message':('Wireless usage delivered · device responding' if transport=='bluetooth' else 'Usage delivered · device responding') if connected else 'USB open · no compatible firmware response'}
+            session.link={'connected':connected,'port':port,'status':answer.get('status') if connected else None,'last_ack_at':time.time() if connected else None,'delivery_ms':round((time.monotonic()-sent_at)*1000),'transport':transport,'message':('Wireless usage delivered · device responding' if transport=='bluetooth' else 'Usage delivered · device responding') if connected else 'USB open · no compatible firmware response'}
+            await remember_status(session, answer['status'])
             if connected and controls and answer['status'].get('control_seq')==controls['seq']:
                 if 'pairing_token' in controls:provisioned=True
-                if _pending_controls and _pending_controls.get('seq')==controls['seq']:_pending_controls=None
+                if session.pending_controls and session.pending_controls.get('seq')==controls['seq']:session.pending_controls=None
             await runtime.wait_for_update(revision)
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        retry=not (isinstance(exc,ValueError) and str(exc).startswith('Pairing changed.'))
-        _link={'connected':False,'port':port,'status':None,'transport':transport,'message':str(exc) if isinstance(exc,ValueError) and str(exc).startswith('Pairing changed.') else 'Bluetooth not responding. Check macOS Bluetooth permission, pairing and USB provisioning, then reconnect.' if transport=='bluetooth' else 'Device disconnected or not responding. Reconnect to retry.'}
+        retry=not (isinstance(exc,ValueError) and str(exc).startswith(('Pairing changed.', 'Device identity changed.')))
+        session.link={'connected':False,'port':port,'status':None,'transport':transport,'message':str(exc) if isinstance(exc,ValueError) and str(exc).startswith(('Pairing changed.', 'Device identity changed.')) else 'Bluetooth not responding. Check macOS Bluetooth permission, pairing and USB provisioning, then reconnect.' if transport=='bluetooth' else 'Device disconnected or not responding. Reconnect to retry.'}
     finally:
         if proc and proc.returncode is None:
             proc.kill();await proc.wait()
+    persist_devices()
     return retry,delivered

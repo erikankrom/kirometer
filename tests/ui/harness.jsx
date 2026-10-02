@@ -12,7 +12,7 @@ const connected = () => ({
     device_id: "test-device",
     touch_supported: true, touch_events: 12, swipe_events: 3, paired: true, uptime_seconds: 420, animation_interval_ms: 50,
     device_name: "Alex’s Kirometer",
-    version: "0.6.0",
+    version: "0.9.0",
     controls_supported: true,
     screen_layouts_supported: true, screen_layouts_version: 2,
     screen_layout: "ghost", default_screen_layout: "ghost",
@@ -36,9 +36,13 @@ let info = {
   port_details: [{device:"/dev/cu.test-device",serial_number:"SAMPLE-USB-SERIAL",description:"USB JTAG/serial debug unit",vid:12346,pid:4097}],
   bundled_firmware: "/test/firmware.json",
   link: connected(),
-  job: { id: "old-flash", kind: "flash", state: "complete", version: "0.6.0", device:{device_id:"test-device"} },
-  firmware_updates: [{id:"mine",kind:"flash",state:"complete",version:"0.6.0",device:{device_id:"test-device",usb_serial:"SAMPLE-USB-SERIAL"},port:"/dev/cu.test-device",console:"Hash of data verified."},{id:"other",kind:"flash",state:"failed",version:"0.7.1",device:{device_id:"other-device"},port:"/dev/cu.test-device",console:"OTHER DEVICE LOG MUST NOT APPEAR"}],
+  job: { id: "old-flash", kind: "flash", state: "complete", version: "0.9.0", device:{device_id:"test-device"} },
+  firmware_updates: [{id:"mine",kind:"flash",state:"complete",version:"0.9.0",device:{device_id:"test-device",usb_serial:"SAMPLE-USB-SERIAL"},port:"/dev/cu.test-device",console:"Hash of data verified."},{id:"other",kind:"flash",state:"failed",version:"0.7.1",device:{device_id:"other-device"},port:"/dev/cu.test-device",console:"OTHER DEVICE LOG MUST NOT APPEAR"}],
 };
+const savedDevice = (id, name, online) => ({id, name, device_id:id, transport:"bluetooth", port:id, auto_connect:true,
+  last_seen:Math.floor(Date.now()/1000)- (online ? 5 : 3600), last_status:{device_id:id,device_name:name,version:"0.9.0"},
+  link:online ? {...connected(),status:{...connected().status,device_id:id,device_name:name}} : {connected:false,transport:"bluetooth",port:id,status:null,reconnecting:true,retry_in_seconds:160,message:"Unavailable"}});
+info.devices = [savedDevice("home", "Home Kirometer", true), savedDevice("work", "Work Kirometer", false)];
 const usage = {
   available: true,
   stale: false,
@@ -67,7 +71,15 @@ const api = {
   async post(path, body) {
     const op = path.split("/").pop();
     if(op === "settings") {pollingSeconds=body.poll_seconds; return {poll_seconds:pollingSeconds};}
+    if (op === "retry") {
+      const device=info.devices.find(d=>d.id===body.configured_id);
+      device.link={connected:false,connecting:true,status:null,transport:"bluetooth",port:device.id};
+      setTimeout(()=>{Object.assign(device,savedDevice(device.id,device.name,true));},900);
+      return {connecting:true,configured_id:device.id};
+    }
     if (op === "controls") {
+      const target=info.devices?.find(d=>d.id===body.configured_id);
+      if(target) info.link=target.link;
       const seq = ++sequence;
       setTimeout(() => {
         Object.assign(info.link.status, body, { control_seq: seq });
@@ -77,6 +89,8 @@ const api = {
       return { queued: true, control_seq: seq };
     }
     if (op === "disconnect") {
+      const target=info.devices?.find(d=>d.id===body.configured_id);
+      if(target) target.link={...target.link,connected:false,reconnecting:false,status:null,message:"Disconnected"};
       info.link = { connected: false, port: null, status: null };
       return info.link;
     }
@@ -97,7 +111,7 @@ const api = {
     }
     if (op === "bundle")
       return {
-        version: "0.6.0",
+        version: "0.9.0",
         board: "waveshare-esp32-s3-touch-amoled-2.16",
         images: [{ offset: 0, size: 1024 }],
       };
@@ -115,7 +129,7 @@ const api = {
       };
       setTimeout(() => {
         info.job.state = "complete";
-        info.job.version = "0.6.0";
+        info.job.version = "0.9.0";
       }, 600);
       return info.job;
     }
@@ -142,6 +156,7 @@ function Harness() {
           <select
             onChange={(e) => {
               scenario = e.target.value;
+              info.devices=scenario === "multiple" ? [savedDevice("home","Home Kirometer",true),savedDevice("work","Work Kirometer",false)] : scenario === "empty" ? [] : [savedDevice("home","Home Kirometer",true)];
               info.link =
                 scenario === "empty"
                   ? { connected: false, port: null, status: null }
@@ -149,7 +164,8 @@ function Harness() {
               setRevision((v) => v + 1);
             }}
           >
-            <option value="connected">Connected</option>
+            <option value="multiple">Home and Work</option>
+            <option value="connected">One device</option>
             <option value="empty">No device</option>
             <option value="error">API unavailable</option>
             <option value="empty-scan">No nearby devices</option>

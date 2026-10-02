@@ -14,14 +14,18 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'exports'
 OUT.mkdir(exist_ok=True)
 P = dict(stock_width=46.0, stock_height=46.0, stock_depth=22.5,
-         clearance_per_side=0.4, front_thickness=2.4,
+         clearance_per_side=0.4, front_thickness=2.4, screen_seat=0.8,
          body_depth=27.5, cover_thickness=2.4, window=44.4,
          pocket_radius=6.2, pocket_wall=2.4,
-         usb_width=13.0, usb_height=8.0,
-         desk_tilt_degrees=15.0, rear_tail_extension=8.5, plunger_shaft_diameter=6.8,
-         target_body_width=66.0, target_body_height=80.0, maximum_depth=36.0,
+         usb_width=16.0, usb_height=8.0, adapter_front_offset=5.0,
+         adapter_fit='UGREEN_B0FNCT8NS7_16mm_channel_physical_fit_pending',
+         button_center_from_front=9.6, button_diameter=5.3,
+         button_wall_base_z=3.2, button_wall_top_z=2.4,
+         button_access='direct_buttons_near_vertical_wall_with_cover_tongue', revision='v9',
+         desk_tilt_degrees=15.0, rear_tail_extension=8.5,
+         target_body_width=66.0, target_body_height=80.0, maximum_depth=29.9,
          ground_y=-39.3,
-         closure_slide_travel=0.0, closure_clearance=-0.04,
+         closure_slide_travel=0.0, closure_clearance=0.04, socket_diameter=2.68, peg_root_diameter=2.64,
          closure_type='vertical_tapered_peg_friction_fit',
          print_design='support_minimized_45_degree_roofs_and_tapers')
 
@@ -41,7 +45,7 @@ def material(name, color):
 WHITE = material('Ghost / warm white', (.94, .93, .91))
 PURPLE = material('Kiro purple 500', (.5686, .2784, 1))
 DARK = material('Kiro prey 900', (.095, .085, .114))
-GLASS = material('AMOLED glass', (.006, .004, .012))
+GLASS = material('AMOLED glass', (0, 0, 0))
 
 
 def extrude(name, points, z0, z1):
@@ -86,13 +90,6 @@ def loft(name,first,last,z0,z1):
     bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
     bm.to_mesh(mesh); bm.free()
     return ob
-
-
-def button_passage(x,r=3.8,y0=26.5,y1=72):
-    z=15.3
-    profile=[(x+r*math.cos(math.radians(135+i*270/48)),z+r*math.sin(math.radians(135+i*270/48))) for i in range(49)]
-    profile.append((x,z+r*math.sqrt(2)))
-    return along_y('Self-supporting button passage',profile,y0,y1)
 
 
 def box(name, size, center):
@@ -177,61 +174,66 @@ boolean(body, frame, 'UNION')
 mounts=[(side,y) for side in (-1,1) for y in (-9,14)]
 for side,y in mounts:
     boolean(body,cyl('Vertical friction socket boss',1.9,25.9,(side*25.4,y,14.55)),'UNION')
-# Retain the unchanged factory-housing clearance envelope.
-boolean(body, rounded('Final housing clearance', pocket, pocket, P['pocket_radius'], 2.4, 32, y=4))
+# Move the complete factory housing forward to the revised seating lip.
+boolean(body, rounded('Final housing clearance', pocket, pocket, P['pocket_radius'], P['screen_seat'], 32, y=4))
 boolean(body, rounded('Glass opening', P['window'], P['window'], 5.3, -1, 3, y=4))
-# Cable tunnel: oversized for connector shell, exits between the ghost tails.
-boolean(body,along_y('Self-supporting USB passage',[(-6.5,7),(6.5,7),(6.5,15),(0,21.5),(-6.5,15)],-71,-15.5))
-# Board buttons are on its top edge. Three straight channels accept a blunt tool.
-for x in (-10,0,10):
-    boolean(body,button_passage(x))
-    boolean(body, button_passage(x,4.6,27.5,31.5))
+# Relieve the front window edge while retaining a 0.8mm housing seating lip.
+boolean(body,loft('Screen edge chamfer',rounded_points(45.6,45.6,5.9,y=4),
+                  rounded_points(P['window'],P['window'],5.3,y=4),-.01,.6))
+# Close the upper shell's dead space with a continuous sloping button well.
+# The stock housing is its floor: no extra moving parts or roof over the buttons.
+# Official top view: 9.6 mm from the FRONT edge, not the rear edge.
+button_z=P['screen_seat']+P['button_center_from_front']
+upper=extrude('Closed upper cheeks',outline,0,P['body_depth'])
+boolean(upper,box('Keep only above stock buttons',(150,100,80),(0,-22.9,15)))
+boolean(body,upper,'UNION')
+# Near-vertical inner wall: only 0.8 mm setback over 11.9 mm of height.
+# Removing the previous ramp preserves fingertip space at the corrected buttons.
+def across_x(name,profile,x0,x1):
+    ob=extrude(name,profile,x0,x1)
+    for v in ob.data.vertices:
+        y,z,x=v.co;v.co=(x,y,z)
+    bm=bmesh.new();bm.from_mesh(ob.data)
+    bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(ob.data);bm.free()
+    return ob
+boolean(body,across_x('Continuous button well',[(39,P['button_wall_top_z']),(27.1,P['button_wall_base_z']),(27.1,45),(65,45),(65,P['button_wall_top_z'])],-17.4,17.4))
 assign_material(body,WHITE)
 
 # Make the lower ghost tails solid at the back so their integral heels carry load.
 tail_fill=extrude('Solid supported rear tails',outline,0,P['body_depth'])
 boolean(tail_fill,box('Remove upper tail fill',(140,140,80),(0,43,14)))
 boolean(body,tail_fill,'UNION')
-boolean(body,along_y('USB passage through solid tails',[(-6.5,7),(6.5,7),(6.5,15),(0,21.5),(-6.5,15)],-71,-15.5))
+
 for x in (-15,15):
-    boolean(body,loft('Gradually flared rear heel',rounded_points(6,6,2,x,-32),rounded_points(14,14,5,x,-32),24,32),'UNION')
-    boolean(body,rounded('Rear heel end',14,14,5,31.9,P['maximum_depth'],x=x,y=-32),'UNION')
+    boolean(body,loft('Gradually flared rear heel',rounded_points(6,6,.2,x,-32),rounded_points(14,14,.2,x,-32),22,27.5),'UNION')
+    boolean(body,rounded('Flush square heel end',14,14,.2,27.4,P['maximum_depth'],x=x,y=-32),'UNION')
 # Open space between the heels routes the cord to the rear without a pedestal.
-boolean(body,box('Rear cord exit',(15,18,42),(0,-37,25)))
+boolean(body,box('Rear-open adapter clearance',(P['usb_width'],36,42),(0,-37.4,P['screen_seat']+P['adapter_front_offset']+21)))
 
 cover = extrude('Removable rear cover', outline, 0, 2.4)
-# Lower tails are integral solid geometry; cover closes the service cavity above.
-boolean(cover,box('Tail relief',(140,80,8),(0,-67,1)))
+# The cover follows the full lower outline and is clipped to the same desk plane.
 for x in (-15,15):
-    boolean(cover,rounded('Rear heel cover slide clearance',14.5,18.5,5.25,-3,4,x=x,y=-30))
+    boolean(cover,rounded('Square flush heel clearance',14.4,24,.2,-5,4,x=x,y=-36.8))
+# Rear access for fingertips and the right-angle adapter.
+boolean(cover,rounded('Rear button access',35.2,40,.3,-6,4,y=47.1))
+boolean(cover,box('Rear adapter outlet',(P['usb_width']+.6,36,14),(0,-37.4,0)))
+# Short forward tongue closes the gap behind the factory case without trapping it.
+# It withdraws with the cover before the screen unit is inserted/removed.
+boolean(cover,box('Button well rear closure tongue',(34.2,2.6,6.4),(0,25.75,-.8)),'UNION')
 # Tapered cover pegs print tip-up on the cover's exterior face, with no ledges.
 for side,y in mounts:
     x=side*25.4
-    boolean(body,cyl('Open vertical friction socket',1.30,6.5,(x,y,25.25)))
+    boolean(body,cyl('Open vertical friction socket',P['socket_diameter']/2,6.5,(x,y,25.25)))
     bpy.ops.mesh.primitive_cone_add(vertices=64,radius1=1.15,radius2=1.32,depth=5.05,location=(x,y,-2.475))
     peg=bpy.context.object;peg.name='Tapered friction peg'
     boolean(cover,peg,'UNION')
 # Printed rear stops replace the previous foam spacer, with nominal 0.2mm play.
 for x in (-9,9):
-    boolean(cover,rounded('Factory case retention pad',12,8,2,-2.4,.3,x=x,y=4),'UNION')
-# Narrow ventilation slots above the integral heel region.
-for x in (-12,-6,0,6,12):
-    boolean(cover, rounded('Vent', 2.2, 6, 1.1, -1, 4, x=x, y=-22))
+    boolean(cover,rounded('Factory case retention pad',12,8,2,-(P['body_depth']-(P['screen_seat']+P['stock_depth'])-.2),.3,x=x,y=4),'UNION')
+# No decorative rear slots: retain only the necessary adapter outlet.
 assign_material(cover,PURPLE)
 
-# Three captive plungers. Insert from inside before inserting the stock unit.
-plungers=[]
-for index,x in enumerate((-10,0,10),1):
-    plunger=cyl(f'Top button {index}',3.4,11.8,(x,34.1,15.3),'Y')
-    bpy.ops.mesh.primitive_cone_add(vertices=64,radius1=4.2,radius2=3.4,depth=1,location=(x,28.4,15.3))
-    flange=bpy.context.object; flange.name='45 degree plunger retaining flange'
-    flange.rotation_euler.x=-math.pi/2
-    bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
-    boolean(plunger,flange,'UNION')
-    boolean(plunger,cyl('Contact tip',2.4,1.0,(x,27.7,15.3),'Y'),'UNION')
-    boolean(plunger,cyl('Finger cap',4.4,2.4,(x,41,15.3),'Y'),'UNION')
-    assign_material(plunger,PURPLE)
-    plungers.append(plunger)
+# Factory buttons are operated directly; no separate printed plungers.
 
 tilt=math.radians(P['desk_tilt_degrees'])
 # Cut a common desk plane into the ghost's lobes at a 15-degree viewing angle.
@@ -240,13 +242,16 @@ floor=box('15 degree ground plane cutter',(180,80,180),(0,P['ground_y']-40,15))
 from mathutils import Matrix
 floor.matrix_world=Matrix.Rotation(-tilt,4,'X') @ floor.matrix_world
 boolean(body,floor)
+cover_floor=box('Cover common desk plane',(180,80,180),(0,P['ground_y']-40,15))
+cover_floor.matrix_world=Matrix.Translation((0,0,-P['body_depth'])) @ Matrix.Rotation(-tilt,4,'X') @ cover_floor.matrix_world
+boolean(cover,cover_floor)
 
 # A low-cost window/pocket coupon checks printer and stock-case fit before the shell.
 coupon = rounded('Fit coupon', 54, 54, 9, 0, 8, y=4)
-boolean(coupon, rounded('Coupon pocket', pocket,pocket,6.2,2.4,10,y=4))
+boolean(coupon, rounded('Coupon pocket', pocket,pocket,6.2,P['screen_seat'],10,y=4))
 boolean(coupon, rounded('Coupon window',44.4,44.4,5.3,-1,3,y=4))
 boolean(coupon,rounded('Friction-fit coupon tab',12,24,2,0,8,x=31,y=4),'UNION')
-for y,r in [(-4,1.28),(4,1.30),(12,1.32)]:
+for y,r in [(-4,1.32),(4,1.34),(12,1.36)]:
     boolean(coupon,cyl('Friction-fit test socket',r,10,(32,y,4)))
 coupon.data.materials.append(WHITE)
 
@@ -276,7 +281,7 @@ report = {'parameters_mm':P,'parts':{}}
 # CSG collision check against the official factory housing envelope.
 collision=body.copy(); collision.data=body.data.copy()
 bpy.context.collection.objects.link(collision)
-boolean(collision, rounded('Stock envelope test',46,46,5.8,2.401,24.9,y=4),'INTERSECT')
+boolean(collision, rounded('Stock envelope test',46,46,5.8,P['screen_seat']+.001,P['screen_seat']+P['stock_depth'],y=4),'INTERSECT')
 bm=bmesh.new(); bm.from_mesh(collision.data)
 overlap=abs(bm.calc_volume()); bm.free()
 bpy.data.objects.remove(collision,do_unlink=True)
@@ -286,7 +291,7 @@ report['stock_envelope_overlap_mm3']=overlap
 seated=cover.copy(); seated.data=cover.data.copy()
 bpy.context.collection.objects.link(seated); seated.location.z=P['body_depth']
 cover_overlaps={}
-for label,tool in [('body',body),('factory_housing',rounded('Cover stock test',46,46,5.8,2.401,24.9,y=4))]:
+for label,tool in [('body',body),('factory_housing',rounded('Cover stock test',46,46,5.8,P['screen_seat']+.001,P['screen_seat']+P['stock_depth'],y=4))]:
     probe=seated.copy(); probe.data=seated.data.copy(); bpy.context.collection.objects.link(probe)
     cutter=tool.copy(); cutter.data=tool.data.copy(); bpy.context.collection.objects.link(cutter)
     boolean(probe,cutter,'INTERSECT')
@@ -308,11 +313,11 @@ for label,tool in [('body',body),('factory_housing',rounded('Cover stock test',4
     cover_overlaps[label]=round(value,6)
     bpy.data.objects.remove(probe,do_unlink=True)
     if label=='factory_housing': bpy.data.objects.remove(tool,do_unlink=True)
-    allowed=1.0 if label=='body' else .01
+    allowed=.01
     if value>allowed: raise RuntimeError(f'Cover overlaps {label} beyond nominal peg interference: {value} mm3')
 bpy.data.objects.remove(seated,do_unlink=True)
 report['seated_cover_overlap_mm3']=cover_overlaps
-# Sample the two assembly motions: straight insertion at -4mm Y, then slide up.
+# Check straight rear-cover insertion; no sliding or flexing required.
 motion_checks=[]
 for dy,dz in [(0,6),(0,4),(0,2),(0,1),(0,.5),(0,.2),(0,0)]:
     probe=cover.copy(); probe.data=cover.data.copy(); bpy.context.collection.objects.link(probe)
@@ -322,21 +327,20 @@ for dy,dz in [(0,6),(0,4),(0,2),(0,1),(0,.5),(0,.2),(0,0)]:
     bm=bmesh.new(); bm.from_mesh(probe.data); value=abs(bm.calc_volume()); bm.free()
     bpy.data.objects.remove(probe,do_unlink=True)
     motion_checks.append({'y_offset_mm':dy,'z_offset_mm':dz,'overlap_mm3':round(value,6)})
-    if value>1.0: raise RuntimeError(f'Cover motion blocked beyond nominal peg interference at {dy},{dz}: {value} mm3')
+    if value>.01: raise RuntimeError(f'Cover motion blocked beyond nominal peg interference at {dy},{dz}: {value} mm3')
 report['sampled_cover_assembly_motion']=motion_checks
 parts=[(body,'kirometer-ghost-body.stl'),(cover,'kirometer-rear-cover.stl'),(coupon,'kirometer-fit-coupon.stl')]
-parts += [(ob,f'kirometer-top-button-{i}.stl') for i,ob in enumerate(plungers,1)]
 for ob,filename in parts:
     bm=bmesh.new(); bm.from_mesh(ob.data)
     bmesh.ops.remove_doubles(bm,verts=list(bm.verts),dist=0.00001)
     bmesh.ops.dissolve_degenerate(bm,dist=0.000001,edges=list(bm.edges))
     bm.to_mesh(ob.data); bm.free()
     report['parts'][filename] = inspect(ob)
-    # Export plungers cap-down with a flat surface at Z=0.
+    # Export the rear cover exterior-down, with a flat surface at Z=0.
     saved_matrix=ob.matrix_world.copy()
-    if ob in plungers or ob is cover:
+    if ob is cover:
         from mathutils import Matrix
-        print_rotation=math.pi if ob is cover else -math.pi/2
+        print_rotation=math.pi
         ob.matrix_world=Matrix.Rotation(print_rotation,4,'X') @ saved_matrix
         minz=min((ob.matrix_world@v.co).z for v in ob.data.vertices)
         ob.location.z-=minz
@@ -346,29 +350,39 @@ for ob,filename in parts:
     ob.matrix_world=saved_matrix
 (OUT/'geometry-validation.json').write_text(json.dumps(report,indent=2))
 coupon.hide_render=True; coupon.hide_viewport=True
-# Save editable assembly. The wedge key is shown with its stem seated in the seam.
 
 # Save editable assembly. Rear cover is positioned at the rear face.
 cover.location.z=P['body_depth']
-stock = rounded('Reference stock unit - not printable',46,46,5.8,2.4,24.9,y=4)
-stock.data.materials.append(DARK)
-glass = rounded('Reference glass - not printable',43.3,43.3,5.3,1.9,2.3,y=4)
+stock = rounded('Reference stock unit - not printable',46,46,5.8,P['screen_seat'],P['screen_seat']+P['stock_depth'],y=4)
+stock.data.materials.append(WHITE)
+reference_buttons=[]
+for x in (-10,0,10):
+    cap=cyl('Factory button - reference only',P['button_diameter']/2,.8,(x,27.4,button_z),'Y')
+    assign_material(cap,WHITE);reference_buttons.append(cap)
+glass = rounded('Reference glass - not printable',43.3,43.3,5.3,P['screen_seat']-.15,P['screen_seat']-.01,y=4)
 glass.data.materials.append(GLASS)
 
-# Show mascot on glass as a small solid white silhouette. Render-only geometry.
-ghost = extrude('Animated mascot reference - render only',[(x*.19,y*.19+6) for x,y in outline],1.75,1.85)
-ghost.data.materials.append(WHITE)
-for x in (-1.4,2.1):
-    eye=cyl('Mascot eye',1, .15,(x,9,1.68)); eye.scale.y=1.6; eye.data.materials.append(GLASS)
-# Render-only purple utilization bar, clearly illustrative.
-bar=rounded('Illustrative meter track',31,2,1,1.7,1.8,y=-10)
-bar.data.materials.append(DARK)
-bar=rounded('Illustrative meter fill',23,2,1,1.6,1.7,x=4,y=-10)
-bar.data.materials.append(PURPLE)
-
+# Official Kiro sprite on a render-only plane, with alpha transparency.
+img=bpy.data.images.load(str(ROOT/'previews/assets/kiro-ghost/south.png'))
+img.pack()
+mat=bpy.data.materials.new('Official Kiro ghost - render only');mat.use_nodes=True
+nodes=mat.node_tree.nodes;nodes.clear()
+out=nodes.new('ShaderNodeOutputMaterial');mix=nodes.new('ShaderNodeMixShader')
+transparent=nodes.new('ShaderNodeBsdfTransparent');em=nodes.new('ShaderNodeEmission')
+tex=nodes.new('ShaderNodeTexImage');tex.image=img
+mat.node_tree.links.new(tex.outputs['Color'],em.inputs['Color'])
+mat.node_tree.links.new(tex.outputs['Alpha'],mix.inputs[0])
+mat.node_tree.links.new(transparent.outputs[0],mix.inputs[1]);mat.node_tree.links.new(em.outputs[0],mix.inputs[2])
+mat.node_tree.links.new(mix.outputs[0],out.inputs[0])
+bpy.ops.mesh.primitive_plane_add(size=20,location=(0,8,P['screen_seat']-.2))
+ghost=bpy.context.object;ghost.name='Official Kiro mascot - render only'
+ghost.rotation_euler.y=math.pi;ghost.data.materials.append(mat)
+# Illustrative static display on a pure black screen.
+bar=rounded('Illustrative meter track',31,2,1,.45,.5,y=-10);bar.data.materials.append(DARK)
+bar=rounded('Illustrative meter fill',23,2,1,.4,.44,x=-4,y=-10);bar.data.materials.append(PURPLE)
 # Place the self-supporting ghost on its flat tail contact surfaces for the render.
 from mathutils import Matrix
-for ob in [body,cover,stock,glass,ghost,*plungers]+[ob for ob in bpy.data.objects if ob.name.startswith(('Mascot eye','Illustrative'))]:
+for ob in [body,cover,stock,glass,ghost,*reference_buttons]+[ob for ob in bpy.data.objects if ob.name.startswith(('Mascot eye','Illustrative'))]:
     ob.matrix_world=Matrix.Rotation(tilt,4,'X') @ ob.matrix_world
 desk=box('Desk surface - render only',(500,.1,400),(0,P['ground_y']-.05,20))
 assign_material(desk,DARK)
@@ -380,14 +394,14 @@ direction=(Vector((0,0,12))-camera.location).normalized()
 right=direction.cross(Vector((0,1,0))).normalized()
 up=right.cross(direction).normalized()
 camera.rotation_euler=Matrix((right,up,-direction)).transposed().to_euler()
-camera.data.type='ORTHO'; camera.data.ortho_scale=150
+camera.data.type='ORTHO'; camera.data.ortho_scale=115
 bpy.context.scene.camera=camera
 for loc,energy,size in [((0,130,-130),140000,110),((-110,20,-50),65000,100),((70,80,130),150000,90)]:
     bpy.ops.object.light_add(type='AREA',location=loc)
     lamp=bpy.context.object; lamp.data.energy=energy; lamp.data.shape='DISK'; lamp.data.size=size
     lamp.rotation_euler=(Vector((0,0,10))-lamp.location).to_track_quat('-Z','Y').to_euler()
 scene=bpy.context.scene
-scene.render.engine='CYCLES'; scene.cycles.samples=48
+scene.render.engine='CYCLES'; scene.cycles.samples=32
 scene.world.color=(.12,.10,.16)
 scene.render.resolution_x=1100; scene.render.resolution_y=1100; scene.render.resolution_percentage=100
 scene.view_settings.view_transform='AgX'
@@ -400,6 +414,7 @@ desk.hide_render=True
 cover.location.x=95
 
 stock.hide_render=True; glass.hide_render=True; ghost.hide_render=True
+for ob in reference_buttons: ob.hide_render=True
 for ob in bpy.data.objects:
     if ob.name.startswith(('Mascot eye','Illustrative')): ob.hide_render=True
 camera.location=(125,65,205)

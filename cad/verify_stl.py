@@ -22,6 +22,6 @@ for path in sorted((root/'exports').glob('*.stl')):
     assert bad==0, f'{path.name}: {bad} non-manifold edges'
     assert volume>0, f'{path.name}: inward or zero volume'
     results[path.name]={'triangles':count,'non_manifold_edges':bad,'volume_mm3':round(volume,2)}
-assert len(results)==6, 'Expected exactly six print parts'
+assert len(results)==3, 'Expected body, cover, and fit coupon only'
 (root/'exports/stl-validation.json').write_text(json.dumps(results,indent=2))
 print(json.dumps(results,indent=2))

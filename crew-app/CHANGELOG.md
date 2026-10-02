@@ -1,3 +1,29 @@
+## Navigation update
+
+- Split Devices, Screen gallery, and Create with Kiro (Beta) into header-linked pages.
+- Keep device settings in body tabs and preserve drafts across page navigation.
+
+# 0.13.0
+
+- Add the AI screen designer (Beta): tool-free Kiro generation, sample-data previews, refinement, and a saved custom gallery.
+- Add firmware 0.9.0 with a bounded, independently validated custom-face slot; all built-in faces and core controls remain available.
+- Show firmware compatibility before applying custom faces. No automatic flashing.
+
+# 0.12.0
+
+- Raise usage age-based staleness to one hour for both Crew billing and IDE fallback caches, independent of five-minute collection and live activity. Firmware receives this status over its existing connection; no flash is required.
+
+- Add a theme-aware device grid card with direct Discover existing and Add new device setup actions.
+
+- Firmware 0.8.0 replaces repeated credit details with Session Activity on all six faces: today’s sessions, messages and tool calls, plus weekly/monthly session counts.
+- Refresh local CLI session aggregates independently every two minutes through Crew’s cached parser; retain stale readings on failures and mark incomplete data.
+- Sound features remain withdrawn. Firmware installation still requires USB-C.
+
+- Place Kiro usage first, to the left of saved devices, and remove the app-page usage interval controls; automatic collection continues.
+
+- Saved device card grid with independent connections, targeted controls, offline details, Retry now and Pause retries.
+- Persistent reconnect preferences and per-device exponential backoff capped at five minutes; stable delivery resets the delay.
+
 # Changelog
 
 ## 0.11.4

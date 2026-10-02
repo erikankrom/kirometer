@@ -7,7 +7,7 @@ SERVICE='f3641400-00b0-4240-ba50-05ca45bf8abc'
 RX='f3641401-00b0-4240-ba50-05ca45bf8abc'
 TX='f3641402-00b0-4240-ba50-05ca45bf8abc'
 PAIR='f3641403-00b0-4240-ba50-05ca45bf8abc'
-STATUS_KEYS=('version','device_id','screen_layout','default_screen_layout','screen_layouts_supported','screen_layouts_version','swipe_events','touch_supported','touch_events','last_wake','animation_interval_ms','animation_ticks','partial_frames','full_frames','last_render_us','max_partial_render_us','max_animation_gap_ms','ble_reply_drops','device_name','bluetooth_supported','bluetooth_connected','paired','uptime_seconds','battery_percent','charging','power_source','displayed_seq','display_usage_available','display_usage_used','display_usage_limit','display_usage_overage','usage_connected','usage_available','usage_stale','activity','brightness','sleep_mode','sleeping','sleep_after','control_seq','controls_supported')
+STATUS_KEYS=('custom_faces_supported','custom_faces_version','custom_face_name','custom_face_revision','version','device_id','screen_layout','default_screen_layout','screen_layouts_supported','screen_layouts_version','swipe_events','touch_supported','touch_events','last_wake','animation_interval_ms','animation_ticks','partial_frames','full_frames','last_render_us','max_partial_render_us','max_animation_gap_ms','ble_reply_drops','device_name','bluetooth_supported','bluetooth_connected','paired','uptime_seconds','battery_percent','charging','power_source','displayed_seq','display_usage_available','display_usage_used','display_usage_limit','display_usage_overage','usage_connected','usage_available','usage_stale','activity','brightness','sleep_mode','sleeping','sleep_after','control_seq','controls_supported')
 
 def project(data):
     return {k:data[k] for k in STATUS_KEYS if k in data and (data[k] is None or isinstance(data[k],(str,int,float,bool))) and len(str(data[k]))<=100}
@@ -57,7 +57,7 @@ async def run():
         await client.write_gatt_char(RX,b'\n',response=True)
         while raw:=await asyncio.to_thread(sys.stdin.readline):
             data=json.loads(raw);data['token']=config['token']
-            packet=json.dumps(data,allow_nan=False).encode()+b'\n'
+            packet=json.dumps(data,allow_nan=False,separators=(',',':')).encode()+b'\n'
             if len(packet)>4096:raise ValueError('Packet too large')
             while not lines.queue.empty():lines.queue.get_nowait()
             for start in range(0,len(packet),20):await client.write_gatt_char(RX,packet[start:start+20],response=True)
